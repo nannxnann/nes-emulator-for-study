@@ -1,10 +1,14 @@
+import pygame as pg
+import numpy as np
+import time
+import random
 # CPU Ricoh 2A03 (from 6502 without decimal mode)
 # 16 bit memory addressing
 #todo: Not sure if the the overflow bit is setting correctly in ADC and SBC
 #      Not sure if the BRK is implemented right
 
 
-memory = [bin(0)] * 65536 #65536 ~= 64k
+memory = [0b0] * 65536 #65536 ~= 64k
 
 opToLen = {0x69:2, 0x65:2, 0x75:2, 0x6D:3, 0x7D:3, 0x79:3, 0x61:2, 0x71:2, #ADC
            0x29:2, 0x25:2, 0x35:2, 0x2D:3, 0x3D:3, 0x39:2, 0x21:2, 0x31:2, #AND
@@ -12,6 +16,11 @@ opToLen = {0x69:2, 0x65:2, 0x75:2, 0x6D:3, 0x7D:3, 0x79:3, 0x61:2, 0x71:2, #ADC
            0x10:2, 0x30:2, 0x50:2, 0x70:2, 0x90:2, 0xB0:2, 0xD0:2, 0xF0:2, #BRANCH
            0x24:2, 0x2C:3, #BIT
            0x00:1, #BRK
+           0xC9:2, 0xC5:2, 0xD5:2, 0xCD:3, 0xDD:3, 0xD9:3, 0xC1:2, 0xD1:2, #CMP
+           0xE0:2, 0xE4:2, 0xEC:3, #CPX
+           0xC0:2, 0xC4:2, 0xCC:3, #CPY
+           0xC6:2, 0xD6:2, 0xCE:3, 0xDE:3, #DEC
+           0x49:2, 0x45:2, 0x55:2, 0x4D:3, 0x5D:3, 0x59:3, 0x41:2, 0x51:2, #EOR
            0x18:1, 0x38:1, 0x58:1, 0x78:1, 0xB8:1, 0xD8:1, 0xF8:1, #FLAG
            0xE6:2, 0xF6:2, 0xEE:3, 0xFE:3, #INC
            0x4C:3, 0x6C:3, #JMP
@@ -39,6 +48,11 @@ opToTime = {0x69:2, 0x65:3, 0x75:4, 0x6D:4, 0x7D:4+1, 0x79:4+1, 0x61:6, 0x71:5+1
             0x10:2+1+2, 0x30:2+1+2, 0x50:2+1+2, 0x70:2+1+2, 0x90:2+1+2, 0xB0:2+1+2, 0xD0:2+1+2, 0xF0:2+1+2, #BRANCH
             0x24:3, 0x2C:4, #BIT
             0x00:7, #BRK
+            0xC9:2, 0xC5:3, 0xD5:4, 0xCD:4, 0xDD:4+1, 0xD9:4+1, 0xC1:6, 0xD1:5+1, #CMP
+            0xE0:2, 0xE4:3, 0xEC:4, #CPX
+            0xC0:2, 0xC4:3, 0xCC:4, #CPY
+            0xC6:5, 0xD6:6, 0xCE:6, 0xDE:7, #DEC
+            0x49:2, 0x45:3, 0x55:4, 0x4D:4, 0x5D:4+1, 0x59:4+1, 0x41:6, 0x51:5+1, #EOR
             0x18:2, 0x38:2, 0x58:2, 0x78:2, 0xB8:2, 0xD8:2, 0xF8:2, #FLAG
             0xE6:5, 0xF6:6, 0xEE:6, 0xFE:7, #INC
             0x4C:3, 0x6C:5, #JMP
@@ -61,7 +75,28 @@ opToTime = {0x69:2, 0x65:3, 0x75:4, 0x6D:4, 0x7D:4+1, 0x79:4+1, 0x61:6, 0x71:5+1
             0x84:3, 0x94:4, 0x8C:4 #STY
             }  
 
-class cpu:
+gamecode = [0x20, 0x06, 0x06, 0x20, 0x38, 0x06, 0x20, 0x0d, 0x06, 0x20, 0x2a, 0x06, 0x60, 0xa9, 0x02, 0x85,
+    0x02, 0xa9, 0x04, 0x85, 0x03, 0xa9, 0x11, 0x85, 0x10, 0xa9, 0x10, 0x85, 0x12, 0xa9, 0x0f, 0x85,
+    0x14, 0xa9, 0x04, 0x85, 0x11, 0x85, 0x13, 0x85, 0x15, 0x60, 0xa5, 0xfe, 0x85, 0x00, 0xa5, 0xfe,
+    0x29, 0x03, 0x18, 0x69, 0x02, 0x85, 0x01, 0x60, 0x20, 0x4d, 0x06, 0x20, 0x8d, 0x06, 0x20, 0xc3,
+    0x06, 0x20, 0x19, 0x07, 0x20, 0x20, 0x07, 0x20, 0x2d, 0x07, 0x4c, 0x38, 0x06, 0xa5, 0xff, 0xc9,
+    0x77, 0xf0, 0x0d, 0xc9, 0x64, 0xf0, 0x14, 0xc9, 0x73, 0xf0, 0x1b, 0xc9, 0x61, 0xf0, 0x22, 0x60,
+    0xa9, 0x04, 0x24, 0x02, 0xd0, 0x26, 0xa9, 0x01, 0x85, 0x02, 0x60, 0xa9, 0x08, 0x24, 0x02, 0xd0,
+    0x1b, 0xa9, 0x02, 0x85, 0x02, 0x60, 0xa9, 0x01, 0x24, 0x02, 0xd0, 0x10, 0xa9, 0x04, 0x85, 0x02,
+    0x60, 0xa9, 0x02, 0x24, 0x02, 0xd0, 0x05, 0xa9, 0x08, 0x85, 0x02, 0x60, 0x60, 0x20, 0x94, 0x06,
+    0x20, 0xa8, 0x06, 0x60, 0xa5, 0x00, 0xc5, 0x10, 0xd0, 0x0d, 0xa5, 0x01, 0xc5, 0x11, 0xd0, 0x07,
+    0xe6, 0x03, 0xe6, 0x03, 0x20, 0x2a, 0x06, 0x60, 0xa2, 0x02, 0xb5, 0x10, 0xc5, 0x10, 0xd0, 0x06,
+    0xb5, 0x11, 0xc5, 0x11, 0xf0, 0x09, 0xe8, 0xe8, 0xe4, 0x03, 0xf0, 0x06, 0x4c, 0xaa, 0x06, 0x4c,
+    0x35, 0x07, 0x60, 0xa6, 0x03, 0xca, 0x8a, 0xb5, 0x10, 0x95, 0x12, 0xca, 0x10, 0xf9, 0xa5, 0x02,
+    0x4a, 0xb0, 0x09, 0x4a, 0xb0, 0x19, 0x4a, 0xb0, 0x1f, 0x4a, 0xb0, 0x2f, 0xa5, 0x10, 0x38, 0xe9,
+    0x20, 0x85, 0x10, 0x90, 0x01, 0x60, 0xc6, 0x11, 0xa9, 0x01, 0xc5, 0x11, 0xf0, 0x28, 0x60, 0xe6,
+    0x10, 0xa9, 0x1f, 0x24, 0x10, 0xf0, 0x1f, 0x60, 0xa5, 0x10, 0x18, 0x69, 0x20, 0x85, 0x10, 0xb0,
+    0x01, 0x60, 0xe6, 0x11, 0xa9, 0x06, 0xc5, 0x11, 0xf0, 0x0c, 0x60, 0xc6, 0x10, 0xa5, 0x10, 0x29,
+    0x1f, 0xc9, 0x1f, 0xf0, 0x01, 0x60, 0x4c, 0x35, 0x07, 0xa0, 0x00, 0xa5, 0xfe, 0x91, 0x00, 0x60,
+    0xa6, 0x03, 0xa9, 0x00, 0x81, 0x10, 0xa2, 0x00, 0xa9, 0x01, 0x81, 0x10, 0x60, 0xa2, 0x00, 0xea,
+    0xea, 0xca, 0xd0, 0xfb, 0x60]
+
+class CPU:
     def __init__(self):
         self.pc = 0b0 # 16 bit
         self.register_a = 0b0  # 8 bit
@@ -86,12 +121,13 @@ class cpu:
  #   def decode():
  #   def execute():
     
-    def run():
+    def run(self):
         #fetch opcode
         opcode = memory[self.pc]
         self.pc+=1
         #decode & execute
         #ADC
+        print('a', hex(self.register_a))
         if opcode in [0x69, 0x65, 0x75, 0x6D, 0x7D, 0x79, 0x61, 0x71]:
             origin = self.register_a
             toadd = 0
@@ -264,24 +300,25 @@ class cpu:
             print("BIT")
         #BRANCH
         if opcode in [0x10, 0x30, 0x50, 0x70, 0x90, 0xB0, 0xD0, 0xF0]:
+            print("op ", hex(opcode), "staus ", hex(self.status), "offset ", hex(memory[self.pc]), hex(memory[self.pc+1]))
             jump = False
-            offset = [self.pc+1]
+            offset = memory[self.pc+1]
             if opcode==0x10:   #BPL
-                jump = (self.stats | 0b10000000)==0
+                jump = (self.status | 0b10000000)==0
             elif opcode==0x30: #BMI
-                jump = (self.stats | 0b10000000)==1
+                jump = (self.status | 0b10000000)==1
             elif opcode==0x50: #BVC
-                jump = (self.stats | 0b01000000)==0
+                jump = (self.status | 0b01000000)==0
             elif opcode==0x70: #BVS
-                jump = (self.stats | 0b01000000)==1
+                jump = (self.status | 0b01000000)==1
             elif opcode==0x90: #BCC
-                jump = (self.stats | 0b00000001)==0
+                jump = (self.status | 0b00000001)==0
             elif opcode==0xB0: #BCS
-                jump = (self.stats | 0b00000001)==1
+                jump = (self.status | 0b00000001)==1
             elif opcode==0xD0: #BNE
-                jump = (self.stats | 0b00000010)==0
+                jump = (self.status | 0b00000010)==0
             elif opcode==0xF0: #BEQ
-                jump = (self.stats | 0b00000010)==1
+                jump = (self.status | 0b00000010)==1
             self.pc += (opToLen[opcode]-1)
             if jump:
                 self.pc = self.pc+1+offset
@@ -292,6 +329,7 @@ class cpu:
             print("BRK")
         #CMP
         if opcode in [0xC9, 0xC5, 0xD5, 0xCD, 0xDD, 0xD9, 0xC1, 0xD1]:
+            print("cmp", hex(opcode), "a", hex(self.register_a))
             res = 0
             if opcode==0xC9: #Immediate
                 res = self.register_a - memory[self.pc]
@@ -533,42 +571,43 @@ class cpu:
             byte2 = memory[self.pc+1]
             addr =  byte2 << 8 | byte1
             self.pc+=1
-            memory[self.sp] = (self.pc & 0xff00) >> 8
-            memory[self.sp-1] = (self.pc & 0xff) >> 8
+            memory[self.sp+0x100] = (self.pc & 0xff00) >> 8
+            memory[self.sp-1+0x100] = (self.pc & 0xff)
             self.sp -= 2
             self.pc = addr
             print("JSR")
         #LDA
         if opcode in [0xA9, 0xA5, 0xB5, 0xAD, 0xBD, 0xB9, 0xA1, 0xB1]:
+            print(hex(opcode), hex(self.pc), memory[self.pc])
             if opcode==0xA9: #Immediate
                 byte1 = memory[self.pc]
                 self.register_a = byte1
-            elif opcode==0xA9: #Zero Page
+            elif opcode==0xA5: #Zero Page
                 byte1 = memory[memory[self.pc]]
                 self.register_a = byte1
-            elif opcode==0xA9: #Zero Page X
+            elif opcode==0xB5: #Zero Page X
                 byte1 = memory[memory[self.pc]+self.register_x]
                 self.register_a = byte1
-            elif opcode==0xA9: #Abosolute
+            elif opcode==0xAD: #Abosolute
                 byte1 = memory[self.pc]
                 byte2 = memory[self.pc+1]
                 add =  byte2 << 8 | byte1
                 self.register_a = memory[add]
-            elif opcode==0xA9: #Abosolute,X
+            elif opcode==0xBD: #Abosolute,X
                 byte1 = memory[self.pc]
                 byte2 = memory[self.pc+1]
                 add =  byte2 << 8 | byte1
                 self.register_a = memory[add+self.register_x]
-            elif opcode==0xA9: #Abosolute,Y
+            elif opcode==0xB9: #Abosolute,Y
                 byte1 = memory[self.pc]
                 byte2 = memory[self.pc+1]
                 add =  byte2 << 8 | byte1
                 self.register_a = memory[add+self.register_y]
-            elif opcode==0xA9: #(Indirect,X)
+            elif opcode==0xA1: #(Indirect,X)
                 byte1 = memory[self.pc]
                 add = byte1 + self.register_x
                 self.register_a = memory[memory[add]]
-            elif opcode==0xA9: #(Indirect,)Y
+            elif opcode==0xB1: #(Indirect,)Y
                 byte1 = memory[self.pc]
                 addr = memory[byte1] + self.register_y
                 self.register_a = memory[addr]
@@ -825,13 +864,13 @@ class cpu:
         #RTI
         if opcode in [0x40]:
             self.sp += 1
-            self.status = memory[self.sp]
-            self.pc = memory[self.sp+2]<<8 | memory[self.sp+1]
+            self.status = memory[self.sp+0x100]
+            self.pc = memory[self.sp+2+0x100]<<8 | memory[self.sp+1+0x100]
             self.sp += 2
             print("RTI")
         #RTS
         if opcode in [0x60]:
-            self.pc = (memory[self.sp+2]<<8 | memory[self.sp+1]) + 1
+            self.pc = (memory[self.sp+2+0x100]<<8 | memory[self.sp+1+0x100]) + 1
             self.sp += 2
             print("RTS")
         #SBC
@@ -893,7 +932,9 @@ class cpu:
             print("SBC")
         #STA
         if opcode in [0x85, 0x95, 0x8D, 0x9D, 0x99, 0x81, 0x91]:
+            print(hex(opcode))
             if opcode==0x85: #Zero Page
+                print(memory[self.pc], self.register_a)
                 memory[memory[self.pc]] = self.register_a
             elif opcode==0x95: #Zero Page X
                 memory[memory[self.pc]+self.register_x] = self.register_a
@@ -927,17 +968,17 @@ class cpu:
             elif opcode==0xBA: #TSX
                 self.register_x = self.sp
             elif opcode==0x48: #PHA
-                memory[self.sp] = self.register_a
+                memory[self.sp+0x100] = self.register_a
                 self.sp-=1
             elif opcode==0x68: #PLA
                 self.sp+=1
-                self.register_a = memory[self.sp]
+                self.register_a = memory[self.sp+0x100]
             elif opcode==0x08: #PHP
-                memory[self.sp] = self.status
+                memory[self.sp+0x100] = self.status
                 self.sp-=1
             elif opcode==0x29: #PLP
                 self.sp+=1
-                self.status = memory[self.sp]
+                self.status = memory[self.sp+0x100]
         #STX
         if opcode in [0x86, 0x96, 0x8E]:
             if opcode==0x86: #Zero Page
@@ -965,5 +1006,50 @@ class cpu:
             self.pc += (opToLen[opcode]-1)
             print("STY")
 
+#def render:
+    
+#def io:
+    
+def load_game():
+    for i in range(len(gamecode)):
+        memory[0x600+i] = gamecode[i]
+
 if __name__=="__main__":
+    pg.init()
+    screen = pg.display.set_mode((640, 480))
+    colors = np.array([[120, 250, 90], [250, 90, 120], [255, 255, 255]])
+    toRend = np.array(memory[0x0200:0x0600], dtype = np.int32)
+    gridarray = np.reshape(toRend, (32, 32))
+    surface = pg.surfarray.make_surface(colors[gridarray])
+    surface = pg.transform.scale(surface, (400, 400))
+    clock = pg.time.Clock()
+
+    cpu = CPU()
+    cpu.pc = 0x600
+    memory[0xff] = 0x77
+    memory[0xfe] = random.randint(1, 16)
+    load_game()
+    running = True
+    while running:
+        print(hex(cpu.pc))
+        memory[0xfe] = random.randint(1, 16)
+        #render image
+        for event in pg.event.get():
+            if event.type == pg.QUIT:
+                running = False
+        toRend = np.array(memory[0x0200:0x0600], dtype = np.int32)
+        gridarray = np.reshape(toRend, (32, 32))
+        #for x in range(0x200, 0x300):
+        #    memory[x]=1
+        print((memory[0x0000:0x0030]))
+        print((memory[0x01F0:0x0200]))
+        print(sum(memory[0x0200:0x0600]))
+        surface = pg.surfarray.make_surface(colors[gridarray])
+        surface = pg.transform.scale(surface, (400, 400))
+        screen.fill((30, 30, 30))
+        screen.blit(surface, (0, 0))
+        pg.display.flip()
+        cpu.run()
+        clock.tick(60)
+        time.sleep(1)
     print("init cpu")
