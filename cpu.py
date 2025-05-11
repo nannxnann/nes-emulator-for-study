@@ -125,7 +125,7 @@ class CPU:
         #fetch opcode
         opcode = memory[self.pc]
         #DEBUG
-        print("===========================================")
+        print("==============================================")
         print("PC=", hex(cpu.pc), "opcode=", hex(opcode))
         print('reg.a=', hex(self.register_a))
         print('reg.status=', hex(self.status))
@@ -1013,9 +1013,9 @@ class CPU:
             print("STY")
 
 #def render:
-    
+
 #def io:
-    
+
 def load_game():
     for i in range(len(gamecode)):
         memory[0x600+i] = gamecode[i]
