@@ -1045,7 +1045,6 @@ if __name__=="__main__":
         toRend = np.array(memory[0x0200:0x0600], dtype = np.int32)
         gridarray = np.reshape(toRend, (32, 32))
         #for x in range(0x200, 0x300):
-        #    memory[x]=1
         #print((memory[0x0000:0x0030]))
         #print((memory[0x01F0:0x0200]))
         #print(sum(memory[0x0200:0x0600]))
