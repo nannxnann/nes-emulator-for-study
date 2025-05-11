@@ -124,10 +124,16 @@ class CPU:
     def run(self):
         #fetch opcode
         opcode = memory[self.pc]
+        #DEBUG
+        print("===========================================")
+        print("PC=", hex(cpu.pc), "opcode=", hex(opcode))
+        print('reg.a=', hex(self.register_a))
+        print('reg.status=', hex(self.status))
+        print('stackp=', hex(self.sp))
+        print("stack content:", memory[self.sp+0x100:0x200])
         self.pc+=1
         #decode & execute
         #ADC
-        print('a', hex(self.register_a))
         if opcode in [0x69, 0x65, 0x75, 0x6D, 0x7D, 0x79, 0x61, 0x71]:
             origin = self.register_a
             toadd = 0
@@ -932,9 +938,9 @@ class CPU:
             print("SBC")
         #STA
         if opcode in [0x85, 0x95, 0x8D, 0x9D, 0x99, 0x81, 0x91]:
-            print(hex(opcode))
+            #print(hex(opcode))
             if opcode==0x85: #Zero Page
-                print(memory[self.pc], self.register_a)
+                #print(memory[self.pc], self.register_a)
                 memory[memory[self.pc]] = self.register_a
             elif opcode==0x95: #Zero Page X
                 memory[memory[self.pc]+self.register_x] = self.register_a
@@ -1031,7 +1037,6 @@ if __name__=="__main__":
     load_game()
     running = True
     while running:
-        print(hex(cpu.pc))
         memory[0xfe] = random.randint(1, 16)
         #render image
         for event in pg.event.get():
@@ -1041,9 +1046,9 @@ if __name__=="__main__":
         gridarray = np.reshape(toRend, (32, 32))
         #for x in range(0x200, 0x300):
         #    memory[x]=1
-        print((memory[0x0000:0x0030]))
-        print((memory[0x01F0:0x0200]))
-        print(sum(memory[0x0200:0x0600]))
+        #print((memory[0x0000:0x0030]))
+        #print((memory[0x01F0:0x0200]))
+        #print(sum(memory[0x0200:0x0600]))
         surface = pg.surfarray.make_surface(colors[gridarray])
         surface = pg.transform.scale(surface, (400, 400))
         screen.fill((30, 30, 30))
