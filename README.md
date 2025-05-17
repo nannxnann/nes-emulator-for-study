@@ -14,3 +14,7 @@ status 更新待驗證
 數值計算應該採用 2's complement
 
 snake game 目前一路走到 PC 0x641 都正確
+
+todo:
+Harte test set
+snake game 0x641 0x719
