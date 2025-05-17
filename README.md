@@ -4,3 +4,13 @@ nes emulator for study purpose
 https://www.nesdev.org/obelisk-6502-guide/reference.html
 http://www.6502.org/tutorials/6502opcodes.html
 https://bugzmanov.github.io/nes_ebook/chapter_3.html
+
+to verify snake game:
+PC 696 CMP <= Carry flag
+
+
+NOTE:
+status 更新待驗證
+數值計算應該採用 2's complement
+
+snake game 目前一路走到 PC 0x641 都正確

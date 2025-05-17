@@ -98,12 +98,12 @@ gamecode = [0x20, 0x06, 0x06, 0x20, 0x38, 0x06, 0x20, 0x0d, 0x06, 0x20, 0x2a, 0x
 
 class CPU:
     def __init__(self):
-        self.pc = 0b0 # 16 bit
-        self.register_a = 0b0  # 8 bit
+        self.pc = 0b0                 # 16 bit
+        self.register_a = 0b0         # 8 bit
         self.sp = 0b11111111          # 8 bit
-        self.register_x = 0b0  # 8 bit
-        self.register_y = 0b0  # 8 bit
-        self.status = 0b0      # 8 bit  
+        self.register_x = 0b0         # 8 bit
+        self.register_y = 0b0         # 8 bit
+        self.status = 0b00110000      # 8 bit  
         
         #status
         #NV1B DIZC
@@ -127,10 +127,7 @@ class CPU:
         #DEBUG
         print("==============================================")
         print("PC=", hex(cpu.pc), "opcode=", hex(opcode))
-        print('reg.a=', hex(self.register_a))
-        print('reg.status=', hex(self.status))
-        print('stackp=', hex(self.sp))
-        print("stack content:", memory[self.sp+0x100:0x200])
+
         self.pc+=1
         #decode & execute
         #ADC
@@ -187,7 +184,7 @@ class CPU:
             if (origin^self.register_a)&0b10000000:
                 self.status = self.status | 0b01000000
             else:
-                self.status = self.status | 0b10111111
+                self.status = self.status & 0b10111111
             self.pc += (opToLen[opcode]-1)
             print("ADC")
         #AND
@@ -308,26 +305,30 @@ class CPU:
         if opcode in [0x10, 0x30, 0x50, 0x70, 0x90, 0xB0, 0xD0, 0xF0]:
             print("op ", hex(opcode), "staus ", hex(self.status), "offset ", hex(memory[self.pc]), hex(memory[self.pc+1]))
             jump = False
-            offset = memory[self.pc+1]
+            offset = memory[self.pc]
             if opcode==0x10:   #BPL
-                jump = (self.status | 0b10000000)==0
+                jump = (self.status & 0b10000000)==0
             elif opcode==0x30: #BMI
-                jump = (self.status | 0b10000000)==1
+                jump = (self.status & 0b10000000)
             elif opcode==0x50: #BVC
-                jump = (self.status | 0b01000000)==0
+                jump = (self.status & 0b01000000)==0
             elif opcode==0x70: #BVS
-                jump = (self.status | 0b01000000)==1
+                jump = (self.status & 0b01000000)
             elif opcode==0x90: #BCC
-                jump = (self.status | 0b00000001)==0
+                jump = (self.status & 0b00000001)==0
             elif opcode==0xB0: #BCS
-                jump = (self.status | 0b00000001)==1
+                jump = (self.status & 0b00000001)
             elif opcode==0xD0: #BNE
-                jump = (self.status | 0b00000010)==0
+                jump = (self.status & 0b00000010)==0
             elif opcode==0xF0: #BEQ
-                jump = (self.status | 0b00000010)==1
+                jump = (self.status & 0b00000010)
             self.pc += (opToLen[opcode]-1)
+            if offset&0b10000000:
+                offset=((offset^0b11111111)+1)%256
+                offset=-offset
+                print("hoho", offset)
             if jump:
-                self.pc = self.pc+1+offset
+                self.pc = self.pc+offset
             print("BRANCH")
         #BRK
         if opcode in [0x00]:
@@ -363,7 +364,7 @@ class CPU:
             elif opcode==0xD1: #(Indirect,)Y
                 res = self.register_a - memory[memory[memory[self.pc]] + self.register_y]
             # Handle overflow, and set the flag
-            if res >= 0:
+            if res < 0:
                 self.status |= 0b00000001 # Carry flag
             else:
                 self.status &= 0b11111110
@@ -584,7 +585,7 @@ class CPU:
             print("JSR")
         #LDA
         if opcode in [0xA9, 0xA5, 0xB5, 0xAD, 0xBD, 0xB9, 0xA1, 0xB1]:
-            print(hex(opcode), hex(self.pc), memory[self.pc])
+            print(hex(opcode), hex(memory[self.pc]), memory[self.pc])
             if opcode==0xA9: #Immediate
                 byte1 = memory[self.pc]
                 self.register_a = byte1
@@ -688,22 +689,22 @@ class CPU:
             bit0 = 0
             res = 0
             if opcode==0x4A: #Accumulator
-                bit0 = self.register_a|0b00000001
+                bit0 = self.register_a&0b00000001
                 self.register_a >>= 1
                 res = self.register_a
             elif opcode==0x46: #Zero Page
-                bit0 = memory[memory[self.pc]]|0b00000001
+                bit0 = memory[memory[self.pc]]&0b00000001
                 memory[memory[self.pc]] >>= 1
                 res = memory[memory[self.pc]]
             elif opcode==0x56: #Zero Page X
-                bit0 = memory[memory[self.pc]+self.register_x]|0b00000001
+                bit0 = memory[memory[self.pc]+self.register_x]&0b00000001
                 memory[memory[self.pc]+self.register_x] >>= 1
                 res = memory[memory[self.pc]+self.register_x]
             elif opcode==0x4E: #Abosolute
                 byte1 = memory[self.pc]
                 byte2 = memory[self.pc+1]
                 addr =  byte2 << 8 | byte1
-                bit0 = memory[addr] | 0b00000001
+                bit0 = memory[addr] & 0b00000001
                 memory[addr] >>= 1
                 res = memory[addr]
             elif opcode==0x5E: #Abosolute,X
@@ -715,7 +716,7 @@ class CPU:
                 res = memory[addr+self.register_x]
             # Handle overflow, and set the flag
             if bit0:
-                    self.status |= 0b00000001 # Carry flag
+                self.status |= 0b00000001 # Carry flag
             else:
                 self.status &= 0b11111110
             if self.register_a == 0x0:
@@ -770,6 +771,53 @@ class CPU:
             print("ORA")
         #Register Instructions
         if opcode in [0xAA, 0x8A, 0xCA, 0xE8, 0xA8, 0x98, 0x88, 0xC8]:
+            bit7 = 0
+            res = 0
+            if opcode==0xAA: #TAX
+                self.register_x = self.register_a
+                bit7 = self.register_x & 0b10000000
+                res = self.register_x
+            elif opcode==0x8A: #TXA
+                self.register_a = self.register_x
+                bit7 = self.register_a & 0b10000000
+                res = self.register_a
+            elif opcode==0xCA: #DEX
+                self.register_x-=1
+                self.register_x %= 256
+                bit7 = self.register_x & 0b10000000
+                res = self.register_x
+            elif opcode==0xE8: #INX
+                self.register_x+=1
+                self.register_x %= 256
+                bit7 = self.register_x & 0b10000000
+                res = self.register_x
+            elif opcode==0xA8: #TAY
+                self.register_y = self.register_a
+                bit7 = self.register_y & 0b10000000
+                res = self.register_y
+            elif opcode==0x98: #TYA
+                self.register_a = self.register_y
+                bit7 = self.register_a & 0b10000000
+                res = self.register_a
+            elif opcode==0x88: #DEY
+                self.register_y-=1
+                self.register_y %= 256
+                bit7 = self.register_y & 0b10000000
+                res = self.register_y
+            elif opcode==0xC8: #INY
+                self.register_y+=1
+                self.register_y %= 256
+                bit7 = self.register_y & 0b10000000
+                res = self.register_y
+
+            if bit7:
+                self.status |= 0b10000000
+            else:
+                self.status &= 0b01111111
+            if res == 0x0:
+                self.status = self.status | 0b00000010
+            else:
+                self.status = self.status & 0b11111101
             print("Register Instructions")
         #ROL
         if opcode in [0x2A, 0x26, 0x36, 0x2E, 0x3E]:
@@ -814,10 +862,6 @@ class CPU:
                 self.status = self.status | 0b00000010
             else:
                 self.status = self.status & 0b11111101
-            if tested & 0b10000000:
-                self.status = self.status | 0b10000000
-            else:
-                self.status = self.status & 0b01111111
             print("ROL")
         #ROR
         if opcode in [0x6A, 0x66, 0x76, 0x6E, 0x7E]:
@@ -862,10 +906,6 @@ class CPU:
                 self.status = self.status | 0b00000010
             else:
                 self.status = self.status & 0b11111101
-            if tested & 0b10000000:
-                self.status = self.status | 0b10000000
-            else:
-                self.status = self.status & 0b01111111
             print("ROR")
         #RTI
         if opcode in [0x40]:
@@ -933,7 +973,7 @@ class CPU:
             if ((origin^tosub)&0b10000000) and ((origin^self.register_a)&0b10000000):
                 self.status = self.status | 0b01000000
             else:
-                self.status = self.status | 0b10111111
+                self.status = self.status & 0b10111111
             self.pc += (opToLen[opcode]-1)
             print("SBC")
         #STA
@@ -1011,7 +1051,14 @@ class CPU:
                 memory[addr] = register_y
             self.pc += (opToLen[opcode]-1)
             print("STY")
-
+        print("new PC=", hex(self.pc), "opcode=", hex(opcode))
+        print('reg.A=', hex(self.register_a))
+        print('reg.X=', hex(self.register_x))
+        print('reg.Y=', hex(self.register_y))
+        print('SP=', hex(self.sp))
+        print('reg.status=', bin(self.status))
+        
+        print("stack content:", memory[self.sp+0x100:0x200])
 #def render:
 
 #def io:
@@ -1032,12 +1079,12 @@ if __name__=="__main__":
 
     cpu = CPU()
     cpu.pc = 0x600
-    memory[0xff] = 0x77
-    memory[0xfe] = random.randint(1, 16)
+    #memory[0xff] = 0x77
+    memory[0xfe] = random.randint(1, 255)
     load_game()
     running = True
     while running:
-        memory[0xfe] = random.randint(1, 16)
+        memory[0xfe] = random.randint(1, 255)
         #render image
         for event in pg.event.get():
             if event.type == pg.QUIT:
@@ -1055,5 +1102,8 @@ if __name__=="__main__":
         pg.display.flip()
         cpu.run()
         clock.tick(60)
-        time.sleep(1)
+        inp = input("wait")
+        if inp=='m':
+            print("mem content:", memory[:0x20])
+        #time.sleep(1)
     print("init cpu")
