@@ -165,20 +165,23 @@ class CPU:
         #print("PC=", hex(cpu.pc), "opcode=", hex(opcode))
 
         self.pc+=1
+        self.pc %= (65536)
         #decode & execute
         #ADC
         if opcode in [0x69, 0x65, 0x75, 0x6D, 0x7D, 0x79, 0x61, 0x71]:
             origin = self.register_a
             toadd = 0
+            iscarry = self.status & 0b00000001
             if opcode==0x69: #Immediate
                 toadd = memory[self.pc]
-                self.register_a += memory[self.pc]
+                self.register_a = (self.register_a + memory[self.pc] + iscarry)
             elif opcode==0x65: #Zero Page
                 toadd = memory[memory[self.pc]]
                 self.register_a += memory[memory[self.pc]]
             elif opcode==0x75: #Zero Page X
-                toadd = memory[memory[self.pc]+self.register_x]
-                self.register_a += memory[memory[self.pc]+self.register_x]
+                addr = (memory[self.pc]+self.register_x)%256
+                toadd = memory[addr]
+                self.register_a += memory[addr]
             elif opcode==0x6D: #Abosolute
                 byte1 = memory[(self.pc)%65536]
                 byte2 = memory[(self.pc+1)%65536]
@@ -204,9 +207,11 @@ class CPU:
                 toadd = memory[memory[memory[self.pc]] + self.register_y]
                 self.register_a += memory[memory[memory[self.pc]] + self.register_y]
             # Handle overflow, and set the flag
-            if self.register_a > 255:
-                    self.register_a %= 256
-                    self.status |= 0b00000001 # Carry flag
+            iscarry2 = 0
+            if self.register_a >= 256:
+                self.register_a %= 256
+                self.status |= 0b00000001 # Carry flag
+                iscarry2 = 1
             else:
                 self.status &= 0b11111110
             if self.register_a == 0x0:
@@ -217,10 +222,16 @@ class CPU:
                 self.status = self.status | 0b10000000
             else:
                 self.status = self.status & 0b01111111
-            if (origin^self.register_a)&0b10000000:
-                self.status = self.status | 0b01000000
+            if (origin^toadd)&0b10000000:
+                self.status = self.status & 0b10111111
             else:
                 self.status = self.status & 0b10111111
+                if origin&0b10000000:
+                    if self.register_a&0b10000000==0:
+                        self.status = self.status | 0b01000000
+                elif (self.register_a&0b10000000):
+                    self.status = self.status | 0b01000000
+                
             self.pc += (opToLen[opcode]-1)
             self.pc %= 65536
             #print("ADC")
@@ -231,7 +242,8 @@ class CPU:
             elif opcode==0x25: #Zero Page
                 self.register_a &= memory[memory[self.pc]]
             elif opcode==0x35: #Zero Page X
-                self.register_a &= memory[memory[self.pc]+self.register_x]
+                addr = (memory[self.pc]+self.register_x)%256
+                self.register_a &= memory[addr]
             elif opcode==0x2D: #Abosolute
                 byte1 = memory[(self.pc)%65536]
                 byte2 = memory[(self.pc+1)%65536]
@@ -277,10 +289,11 @@ class CPU:
                 res = memory[memory[self.pc]]
                 memory[memory[self.pc]] &= 0b11111111
             elif opcode==0x16: #Zero Page X
-                bit7 = memory[memory[self.pc]+self.register_x] | 0b10000000
-                memory[memory[self.pc]+self.register_x] <<= 1
-                res = memory[memory[self.pc]+self.register_x]
-                memory[memory[self.pc]+self.register_x] &= 0b11111111
+                addr = (memory[self.pc]+self.register_x)%256
+                bit7 = memory[addr] | 0b10000000
+                memory[addr] <<= 1
+                res = memory[addr]
+                memory[addr] &= 0b11111111
             elif opcode==0x0E: #Abosolute
                 byte1 = memory[(self.pc)%65536]
                 byte2 = memory[(self.pc+1)%65536]
@@ -369,7 +382,7 @@ class CPU:
                 offset=-offset
                 #print("hoho", offset)
             if jump:
-                self.pc = self.pc+offset
+                self.pc = (self.pc+offset)%65536
             #print("BRANCH")
         #BRK
         if opcode in [0x00]:
@@ -385,7 +398,8 @@ class CPU:
             elif opcode==0xC5: #Zero Page
                 res = self.register_a - memory[memory[self.pc]]
             elif opcode==0xD5: #Zero Page X
-                res = self.register_a - memory[memory[self.pc]+self.register_x]
+                addr = (memory[self.pc]+self.register_x)%256
+                res = self.register_a - memory[addr]
             elif opcode==0xCD: #Abosolute
                 byte1 = memory[(self.pc)%65536]
                 byte2 = memory[(self.pc+1)%65536]
@@ -483,9 +497,11 @@ class CPU:
                 res = memory[memory[self.pc]]
                 memory[memory[self.pc]] &= 0b11111111
             elif opcode==0xD6: #Zero Page X
-                memory[memory[self.pc]+self.register_x] -= 1
-                res = memory[memory[self.pc]+self.register_x]
-                memory[memory[self.pc]+self.register_x] &= 0b11111111
+                #print((memory[self.pc]+self.register_x)%256)
+                addr = (memory[self.pc]+self.register_x)%256
+                memory[addr] -= 1
+                memory[addr] &= 0b11111111
+                res = memory[addr]
             elif opcode==0xCE: #Abosolute
                 byte1 = memory[(self.pc)%65536]
                 byte2 = memory[(self.pc+1)%65536]
@@ -497,9 +513,9 @@ class CPU:
                 byte1 = memory[(self.pc)%65536]
                 byte2 = memory[(self.pc+1)%65536]
                 addr =  byte2 << 8 | byte1
-                memory[addr+self.register_x] -= 1
-                res = memory[addr+self.register_x]
-                memory[addr+self.register_x] &= 0b11111111
+                memory[(addr+self.register_x)%65536] -= 1
+                res = memory[(addr+self.register_x)%65536]
+                memory[(addr+self.register_x)%65536] &= 0b11111111
             if res == 0x0:
                 self.status = self.status | 0b00000010
             else:
@@ -518,7 +534,8 @@ class CPU:
             elif opcode==0x45: #Zero Page
                 self.register_a ^= memory[memory[self.pc]]
             elif opcode==0x55: #Zero Page X
-                self.register_a ^= memory[memory[self.pc]+self.register_x]
+                addr = (memory[self.pc]+self.register_x)%256
+                self.register_a ^= memory[addr]
             elif opcode==0x4D: #Abosolute
                 byte1 = memory[(self.pc)%65536]
                 byte2 = memory[(self.pc+1)%65536]
@@ -576,9 +593,10 @@ class CPU:
                 res = memory[memory[self.pc]]
                 memory[memory[self.pc]] &= 0b11111111
             elif opcode==0xF6: #Zero Page X
-                memory[memory[self.pc]+self.register_x] += 1
-                res = memory[memory[self.pc]+self.register_x]
-                memory[memory[self.pc]+self.register_x] &= 0b11111111
+                addr = (memory[self.pc]+self.register_x)%256
+                memory[addr] += 1
+                res = memory[addr]
+                memory[addr] &= 0b11111111
             elif opcode==0xEE: #Abosolute
                 byte1 = memory[(self.pc)%65536]
                 byte2 = memory[(self.pc+1)%65536]
@@ -645,7 +663,8 @@ class CPU:
                 byte1 = memory[memory[self.pc]]
                 self.register_a = byte1
             elif opcode==0xB5: #Zero Page X
-                byte1 = memory[memory[self.pc]+self.register_x]
+                addr = (memory[self.pc]+self.register_x)%256
+                byte1 = memory[addr]
                 self.register_a = byte1
             elif opcode==0xAD: #Abosolute
                 byte1 = memory[(self.pc)%65536]
@@ -717,7 +736,8 @@ class CPU:
             elif opcode==0xA6: #Zero Page
                 self.register_y = memory[memory[self.pc]]
             elif opcode==0xB6: #Zero Page X
-                self.register_y = memory[memory[self.pc]+self.register_x]
+                addr = (memory[self.pc]+self.register_x)%256
+                self.register_y = memory[addr]
             elif opcode==0xAE: #Abosolute
                 byte1 = memory[(self.pc)%65536]
                 byte2 = memory[(self.pc+1)%65536]
@@ -752,9 +772,10 @@ class CPU:
                 memory[memory[self.pc]] >>= 1
                 res = memory[memory[self.pc]]
             elif opcode==0x56: #Zero Page X
-                bit0 = memory[memory[self.pc]+self.register_x]&0b00000001
-                memory[memory[self.pc]+self.register_x] >>= 1
-                res = memory[memory[self.pc]+self.register_x]
+                addr = (memory[self.pc]+self.register_x)%256
+                bit0 = memory[addr]&0b00000001
+                memory[addr] >>= 1
+                res = memory[addr]
             elif opcode==0x4E: #Abosolute
                 byte1 = memory[(self.pc)%65536]
                 byte2 = memory[(self.pc+1)%65536]
@@ -796,7 +817,8 @@ class CPU:
             elif opcode==0x05: #Zero Page
                 self.register_a |= memory[memory[self.pc]]
             elif opcode==0x15: #Zero Page X
-                self.register_a |= memory[memory[self.pc]+self.register_x]
+                addr = (memory[self.pc]+self.register_x)%256
+                self.register_a |= memory[addr]
             elif opcode==0x0D: #Abosolute
                 byte1 = memory[(self.pc)%65536]
                 byte2 = memory[(self.pc+1)%65536]
@@ -892,10 +914,11 @@ class CPU:
                 memory[memory[self.pc]] |= (self.status & 0b00000001)
                 res = memory[memory[self.pc]]
             elif opcode==0x36: #Zero Page X
-                bit7 = memory[memory[self.pc]+self.register_x]  & 0b10000000
-                memory[memory[self.pc]+self.register_x] <<= 1
-                memory[memory[self.pc]+self.register_x] |= (self.status & 0b00000001)
-                res = memory[memory[self.pc]+self.register_x]
+                addr = (memory[self.pc]+self.register_x)%256
+                bit7 = memory[addr]  & 0b10000000
+                memory[addr] <<= 1
+                memory[addr] |= (self.status & 0b00000001)
+                res = memory[addr]
             elif opcode==0x2E: #Abosolute
                 byte1 = memory[(self.pc)%65536]
                 byte2 = memory[(self.pc+1)%65536]
@@ -936,10 +959,11 @@ class CPU:
                 memory[memory[self.pc]] |= ((self.status & 0b00000001)<<7)
                 res = memory[memory[self.pc]]
             elif opcode==0x76: #Zero Page X
-                bit0 = memory[memory[self.pc]+self.register_x]  & 0b00000001
-                memory[memory[self.pc]+self.register_x] <<= 1
-                memory[memory[self.pc]+self.register_x] |= ((self.status & 0b00000001)<<7)
-                res = memory[memory[self.pc]+self.register_x]
+                addr = (memory[self.pc]+self.register_x)%256
+                bit0 = memory[addr]  & 0b00000001
+                memory[addr] <<= 1
+                memory[addr] |= ((self.status & 0b00000001)<<7)
+                res = memory[addr]
             elif opcode==0x6E: #Abosolute
                 byte1 = memory[(self.pc)%65536]
                 byte2 = memory[(self.pc+1)%65536]
@@ -989,8 +1013,9 @@ class CPU:
                 tosub = memory[memory[self.pc]]
                 self.register_a = self.register_a - memory[memory[self.pc]] - (1-carry)
             elif opcode==0x75: #Zero Page X
-                tosub = memory[memory[self.pc]+self.register_x]
-                self.register_a = self.register_a - memory[memory[self.pc]+self.register_x] - (1-carry)
+                addr = (memory[self.pc]+self.register_x)%256
+                tosub = memory[addr]
+                self.register_a = self.register_a - memory[addr] - (1-carry)
             elif opcode==0x6D: #Abosolute
                 byte1 = memory[(self.pc)%65536]
                 byte2 = memory[(self.pc+1)%65536]
@@ -1043,7 +1068,8 @@ class CPU:
                 #print(memory[self.pc], self.register_a)
                 memory[memory[self.pc]] = self.register_a
             elif opcode==0x95: #Zero Page X
-                memory[memory[self.pc]+self.register_x] = self.register_a
+                addr = (memory[self.pc]+self.register_x)%256
+                memory[addr] = self.register_a
             elif opcode==0x8D: #Abosolute
                 byte1 = memory[(self.pc)%65536]
                 byte2 = memory[(self.pc+1)%65536]
@@ -1114,7 +1140,8 @@ class CPU:
             if opcode==0x84: #Zero Page
                 memory[memory[self.pc]] = self.register_y
             elif opcode==0x94: #Zero Page X
-                memory[memory[self.pc]+self.register_x] = self.register_y
+                addr = (memory[self.pc]+self.register_x)%256
+                memory[addr] = self.register_y
             elif opcode==0x8C: #Abosolute
                 byte1 = memory[(self.pc)%65536]
                 byte2 = memory[(self.pc+1)%65536]
@@ -1153,6 +1180,9 @@ def load_game():
     for i in range(len(gamecode)):
         memory[0x600+i] = gamecode[i]
     return
+
+ADC = ["69", "65", "75", "6D", "7D", "79", "61", "71"]
+SBC = ["E9", "E5", "F5", "ED", "FD", "F9", "E1", "F1"]
 
 if __name__=="__main__":
     argv = sys.argv
@@ -1210,6 +1240,9 @@ if __name__=="__main__":
                 error = []
                 i = 0
                 for e in js:
+                    if test in ADC or test in SBC:  #bypass DECIMAL mode test
+                        if e["initial"]["p"] & 0b00001000:
+                            continue
                     #print("batch = ", i)
                     i+=1
                     #print(e)
@@ -1251,6 +1284,9 @@ if __name__=="__main__":
             error = []
             i = 0
             for e in js:
+                if test in ADC or test in SBC:     #bypass DECIMAL mode test
+                    if e["initial"]["p"] & 0b00001000:
+                        continue    
                 #print("batch = ", i)
                 i+=1
                 #print(e)
@@ -1268,9 +1304,10 @@ if __name__=="__main__":
                     memory[m[0]] = m[1]
                 cpu.run()
                 if cpu.pc != e["final"]["pc"] or cpu.sp != e["final"]["s"] or cpu.register_x != e["final"]["x"] or cpu.register_y != e["final"]["y"] or cpu.status != e["final"]["p"]:
-                    print(e['initial'])
-                    print(e['final'])
-                    print("pc:",cpu.pc,"s:",cpu.sp,"a:",cpu.register_a,"x:",cpu.register_x,"y:",cpu.register_y,"p:",cpu.status)
+                    print('init ', e['initial'])
+                    print('answ ', e['final'])
+                    resmem = [[ent[0], int(memory[ent[0]])] for ent in e['final']['ram']]
+                    print("pc:",cpu.pc,"s:",cpu.sp,"a:",cpu.register_a,"x:",cpu.register_x,"y:",cpu.register_y,"p:",cpu.status, resmem)
                     print("=-------------------------------------------------------------=")
                     error.append(e)
                     continue

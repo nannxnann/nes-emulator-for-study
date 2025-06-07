@@ -19,14 +19,14 @@
 16 correct 2536 wrong 7464
 0E correct 4942 wrong 5058
 1E correct 5087 wrong 4913
-10 correct 9996 wrong 4
-30 correct 9994 wrong 6
-50 correct 9997 wrong 3
-70 correct 9996 wrong 4
-90 correct 9995 wrong 5
-B0 correct 9993 wrong 7
-D0 correct 9991 wrong 9
-F0 correct 9992 wrong 8
+10 correct 10000 wrong 0
+30 correct 10000 wrong 0
+50 correct 10000 wrong 0
+70 correct 10000 wrong 0
+90 correct 10000 wrong 0
+B0 correct 10000 wrong 0
+D0 correct 10000 wrong 0
+F0 correct 10000 wrong 0
 24 correct 10000 wrong 0
 2C correct 10000 wrong 0
 00 correct 0 wrong 10000
@@ -44,10 +44,10 @@ EC correct 10000 wrong 0
 C0 correct 39 wrong 9961
 C4 correct 42 wrong 9958
 CC correct 28 wrong 9972
-C6 correct 9999 wrong 1
-D6 correct 5048 wrong 4952
+C6 correct 10000 wrong 0
+D6 correct 10000 wrong 0
 CE correct 10000 wrong 0
-DE correct 9976 wrong 24
+DE correct 10000 wrong 0
 49 correct 10000 wrong 0
 45 correct 10000 wrong 0
 55 correct 7449 wrong 2551
@@ -70,13 +70,13 @@ FE correct 9950 wrong 50
 4C correct 10000 wrong 0
 6C correct 0 wrong 10000
 20 correct 9931 wrong 69
-A9 correct 9999 wrong 1
+A9 correct 10000 wrong 0
 A5 correct 10000 wrong 0
-B5 correct 5033 wrong 4967
+B5 correct 5034 wrong 4966
 AD correct 10000 wrong 0
 BD correct 9990 wrong 10
 B9 correct 9980 wrong 20
-A1 correct 101 wrong 9899
+A1 correct 100 wrong 9900
 B1 correct 116 wrong 9884
 A2 correct 10000 wrong 0
 A6 correct 10000 wrong 0
@@ -102,12 +102,12 @@ EA correct 10000 wrong 0
 19 correct 9995 wrong 5
 01 correct 7496 wrong 2504
 11 correct 7522 wrong 2478
-AA correct 9999 wrong 1
+AA correct 10000 wrong 0
 8A correct 10000 wrong 0
 CA correct 10000 wrong 0
 E8 correct 10000 wrong 0
 A8 correct 10000 wrong 0
-98 correct 9999 wrong 1
+98 correct 10000 wrong 0
 88 correct 10000 wrong 0
 C8 correct 10000 wrong 0
 2A correct 2438 wrong 7562
@@ -136,7 +136,7 @@ F1 correct 2493 wrong 7507
 9D correct 9978 wrong 22
 99 correct 9978 wrong 22
 81 correct 84 wrong 9916
-91 correct 9922 wrong 78
+91 correct 9924 wrong 76
 9A correct 10000 wrong 0
 BA correct 2373 wrong 7627
 48 correct 9963 wrong 37
@@ -149,5 +149,7 @@ BA correct 2373 wrong 7627
 84 correct 10000 wrong 0
 94 correct 5021 wrong 4979
 8C correct 10000 wrong 0
-passed:  ['29', '25', '2D', '3D', '24', '2C', 'E0', 'E4', 'EC', 'CE', '49', '45', '4D', '18', '38', '58', '78', 'B8', '4C', 'A5', 'AD', 'A2', 'A6', 'AE', '4A', 'EA', '09', '05', '0D', '8A', 'CA', 'E8', 'A8', '88', 'C8', '85', '8D', '9A', '86', '8E', '84', '8C']
-not passed:  ['69', '65', '75', '6D', '7D', '79', '61', '71', '35', '39', '21', '31', '0A', '06', '16', '0E', '1E', '10', '30', '50', '70', '90', 'B0', 'D0', 'F0', '00', 'C9', 'C5', 'D5', 'CD', 'DD', 'D9', 'C1', 'D1', 'C0', 'C4', 'CC', 'C6', 'D6', 'DE', '55', '5D', '59', '41', '51', 'D8', 'F8', 'E6', 'F6', 'EE', 'FE', '6C', '20', 'A9', 'B5', 'BD', 'B9', 'A1', 'B1', 'B6', 'BE', 'A0', 'A4', 'B4', 'AC', 'BC', '46', '56', '4E', '5E', '15', '1D', '19', '01', '11', 'AA', '98', '2A', '26', '36', '2E', '3E', '6A', '66', '76', '6E', '7E', '40', '60', 'E9', 'E5', 'F5', 'ED', 'FD', 'F9', 'E1', 'F1', '95', '9D', '99', '81', '91', 'BA', '48', '68', '08', '28', '96', '94']
+passed:  ['29', '25', '2D', '3D', '10', '30', '50', '70', '90', 'B0', 'D0', 'F0', '24', '2C', 'E0', 'E4', 'EC', 'C6', 'D6', 'CE', 'DE', '49', '45', '4D', '18', '38', '58', '78', 'B8', '4C', 'A9', 'A5', 'AD', 'A2', 'A6', 'AE', '4A', 'EA', '09', '05', '0D', 'AA', '8A', 'CA', 'E8', 'A8', '98', '88', 'C8', '85', '8D', '9A', '86', '8E', '84', '8C']
+not passed:  ['69', '65', '75', '6D', '7D', '79', '61', '71', '35', '39', '21', '31', '0A', '06', '16', '0E', '1E', '00', 'C9', 'C5', 'D5', 'CD', 'DD', 'D9', 'C1', 'D1', 'C0', 'C4', 'CC', '55', '5D', '59', '41', '51', 'D8', 'F8', 'E6', 'F6', 'EE', 'FE', '6C', '20', 'B5', 'BD', 'B9', 'A1', 'B1', 'B6', 'BE', 'A0', 'A4', 'B4', 'AC', 'BC', '46', '56', '4E', '5E', '15', '1D', '19', '01', '11', '2A', '26', '36', '2E', '3E', '6A', '66', '76', '6E', '7E', '40', '60', 'E9', 'E5', 'F5', 'ED', 'FD', 'F9', 'E1', 'F1', '95', '9D', '99', '81', '91', 'BA', '48', '68', '08', '28', '96', '94']
+test
+init cpu
