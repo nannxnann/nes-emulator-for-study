@@ -404,8 +404,23 @@ class CPU:
             #print("BRANCH")
         #BRK
         if opcode in [0x00]:
-            #currently nop
-            pass
+            #MSB of PC+2 to stack
+            #LSB of PC+2 to stack
+            #status or BRK flag to stack
+            # disable interrupt
+            #PC = memory[0xffff]<<8+memory[0xfffe]
+            
+            memory[self.sp+0x100] = (self.pc+1)>>8
+            self.sp-=1
+            self.sp%=256
+            memory[self.sp+0x100] = (self.pc+1)%256
+            self.sp-=1
+            self.sp%=256
+            memory[self.sp+0x100] = self.status|0b00010000
+            self.sp-=1
+            self.sp%=256
+            self.status |= 0b00000100
+            self.pc = memory[0xffff]*256 + memory[0xfffe]
             #print("BRK")
         #CMP
         if opcode in [0xC9, 0xC5, 0xD5, 0xCD, 0xDD, 0xD9, 0xC1, 0xD1]:
@@ -1083,55 +1098,60 @@ class CPU:
         #SBC
         if opcode in [0xE9, 0xE5, 0xF5, 0xED, 0xFD, 0xF9, 0xE1, 0xF1]:
             origin = self.register_a
-            carry = self.status|0b00000001
+            iscarry = self.status&0b00000001
+            #carry = ((carry)^0b11111111+1)%256
             tosub = 0
             if opcode==0xE9: #Immediate
-                tosub = memory[self.pc]
-                self.register_a = self.register_a - memory[self.pc] - (1-carry)
+                tosub = ((memory[self.pc]^0b11111111))%256
+                #why this not working
+                #ar = ((carry)^0b11111111+1)%256
+                self.register_a = (self.register_a + tosub + iscarry)
             elif opcode==0xE5: #Zero Page
-                tosub = memory[memory[self.pc]]
-                self.register_a = self.register_a - memory[memory[self.pc]] - (1-carry)
+                tosub = (memory[memory[self.pc]]^0b11111111)%256
+                self.register_a += (tosub + iscarry)
             elif opcode==0xF5: #Zero Page X
                 addr = (memory[self.pc]+self.register_x)%256
-                tosub = memory[addr]
-                self.register_a = self.register_a - memory[addr] - (1-carry)
+                tosub = (memory[addr]^0b11111111)%256
+                self.register_a += (tosub + iscarry)
             elif opcode==0xED: #Abosolute
                 byte1 = memory[(self.pc)%65536]
                 byte2 = memory[(self.pc+1)%65536]
                 addr =  byte2 << 8 | byte1
-                tosub = memory[addr]
-                self.register_a = self.register_a - memory[addr] - (1-carry)
+                tosub = (memory[addr]^0b11111111)%256
+                self.register_a += (tosub+ iscarry)
             elif opcode==0xFD: #Abosolute,X
                 byte1 = memory[(self.pc)%65536]
                 byte2 = memory[(self.pc+1)%65536]
                 addr =  byte2 << 8 | byte1
-                tosub = memory[addr+self.register_x]
-                self.register_a = self.register_a - memory[addr+self.register_x] - (1-carry)
+                tosub = (memory[(addr+self.register_x)%65536] ^0b11111111)%256
+                self.register_a += (tosub + iscarry)
             elif opcode==0xF9: #Abosolute,Y
                 byte1 = memory[(self.pc)%65536]
                 byte2 = memory[(self.pc+1)%65536]
                 addr =  byte2 << 8 | byte1
-                tosub = memory[addr+self.register_y]
-                self.register_a = self.register_a - memory[addr+self.register_y] - (1-carry)
+                tosub = (memory[(addr+self.register_y)%65536]^0b11111111)%256
+                self.register_a += (tosub + iscarry)
             elif opcode==0xE1: #(Indirect,X)
                 base = (memory[self.pc] + self.register_x)%256
                 byte1 = memory[base]
                 byte2 = memory[(base+1)%256]
                 addr =  (byte2 << 8) | byte1
-                tosub = memory[addr]
-                self.register_a = self.register_a - tosub - (1-carry)
+                tosub = (memory[addr]^0b11111111)%256
+                self.register_a += (tosub+ iscarry)
             elif opcode==0xF1: #(Indirect,)Y
                 base = memory[self.pc]
                 byte1 = memory[base]
                 byte2 = memory[(base+1)%256]
                 addr =  ((byte2 << 8) | byte1)
                 addr = (addr + self.register_y)%65536
-                tosub = memory[addr]
-                self.register_a = self.register_a - memory[addr] - (1-carry)
+                tosub = (memory[addr]^0b11111111)%256
+                self.register_a += (tosub + iscarry)
             # Handle overflow, and set the flag
-            if self.register_a < 0:
-                self.register_a |= 0b11111111
+            iscarry2 = 0
+            if self.register_a >= 256:
+                self.register_a %= 256
                 self.status |= 0b00000001 # Carry flag
+                iscarry2 = 1
             else:
                 self.status &= 0b11111110
             if self.register_a == 0x0:
@@ -1142,13 +1162,19 @@ class CPU:
                 self.status = self.status | 0b10000000
             else:
                 self.status = self.status & 0b01111111
-            if ((origin^tosub)&0b10000000) and ((origin^self.register_a)&0b10000000):
-                self.status = self.status | 0b01000000
+            if (origin^tosub)&0b10000000:
+                self.status = self.status & 0b10111111
             else:
                 self.status = self.status & 0b10111111
+                if origin&0b10000000:
+                    if self.register_a&0b10000000==0:
+                        self.status = self.status | 0b01000000
+                elif (self.register_a&0b10000000):
+                    self.status = self.status | 0b01000000
+                
             self.pc += (opToLen[opcode]-1)
             self.pc %= 65536
-            #print("SBC")
+            
         #STA
         if opcode in [0x85, 0x95, 0x8D, 0x9D, 0x99, 0x81, 0x91]:
             #print(hex(opcode))
@@ -1195,6 +1221,7 @@ class CPU:
         # the stack is always on page one ($100-$1FF) and works top down
         if opcode in [0x9A, 0xBA, 0x48, 0x68, 0x08, 0x28]:
             #print("STACK INSTRUCTION")
+            res = None
             if opcode==0x9A: #TXS
                 self.sp = self.register_x
             elif opcode==0xBA: #TSX
@@ -1202,21 +1229,41 @@ class CPU:
             elif opcode==0x48: #PHA
                 memory[self.sp+0x100] = self.register_a
                 self.sp-=1
+                self.sp%=256
             elif opcode==0x68: #PLA
                 self.sp+=1
+                self.sp%=256
                 self.register_a = memory[self.sp+0x100]
+                res = self.register_a
             elif opcode==0x08: #PHP
-                memory[self.sp+0x100] = self.status
+                memory[self.sp+0x100] = self.status|0b00010000
                 self.sp-=1
-            elif opcode==0x29: #PLP
+                self.sp%=256
+            elif opcode==0x28: #PLP delayed irq not implemented
                 self.sp+=1
+                self.sp%=256
+                tmp = self.status&0b00110000
                 self.status = memory[self.sp+0x100]
+                self.status &= 0b11001111
+                self.status |= tmp
+
+            # status register
+            if res!=None:
+                if res == 0:
+                    self.status |= 0b00000010
+                else:
+                    self.status &= 0b11111101
+                if res & 0b10000000:
+                    self.status = self.status | 0b10000000
+                else:
+                    self.status = self.status & 0b01111111
+            
         #STX
         if opcode in [0x86, 0x96, 0x8E]:
             if opcode==0x86: #Zero Page
                 memory[memory[self.pc]] = self.register_x
             elif opcode==0x96: #Zero Page Y
-                memory[memory[self.pc]+self.register_y] = self.register_x
+                memory[(memory[self.pc]+self.register_y)%256] = self.register_x
             elif opcode==0x8E: #Abosolute
                 byte1 = memory[(self.pc)%65536]
                 byte2 = memory[(self.pc+1)%65536]
