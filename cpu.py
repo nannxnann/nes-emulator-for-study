@@ -427,43 +427,53 @@ class CPU:
             #print("cmp", hex(opcode), "a", hex(self.register_a))
             res = 0
             if opcode==0xC9: #Immediate
-                res = self.register_a - memory[self.pc]
+                tosub = ((memory[self.pc]^0b11111111))%256
+                res = self.register_a + tosub + 1
             elif opcode==0xC5: #Zero Page
-                res = self.register_a - memory[memory[self.pc]]
+                tosub = (memory[memory[self.pc]]^0b11111111)%256
+                res = self.register_a + tosub + 1
             elif opcode==0xD5: #Zero Page X
                 addr = (memory[self.pc]+self.register_x)%256
-                res = self.register_a - memory[addr]
+                tosub = (memory[addr]^0b11111111)%256
+                res = self.register_a + tosub + 1
             elif opcode==0xCD: #Abosolute
                 byte1 = memory[(self.pc)%65536]
                 byte2 = memory[(self.pc+1)%65536]
                 addr =  byte2 << 8 | byte1
-                res = self.register_a - memory[addr]
+                tosub = (memory[addr]^0b11111111)%256
+                res = self.register_a + tosub + 1
             elif opcode==0xDD: #Abosolute,X
                 byte1 = memory[(self.pc)%65536]
                 byte2 = memory[(self.pc+1)%65536]
                 addr =  byte2 << 8 | byte1
-                res = self.register_a - memory[addr+self.register_x]
+                tosub = (memory[(addr+self.register_x)%65536] ^0b11111111)%256
+                res = self.register_a + tosub + 1
             elif opcode==0xD9: #Abosolute,Y
                 byte1 = memory[(self.pc)%65536]
                 byte2 = memory[(self.pc+1)%65536]
                 addr =  byte2 << 8 | byte1
-                res = self.register_a - memory[addr+self.register_y]
+                tosub = (memory[(addr+self.register_y)%65536]^0b11111111)%256
+                res = self.register_a + tosub + 1
             elif opcode==0xC1: #(Indirect,X)
                 base = (memory[self.pc] + self.register_x)%256
                 byte1 = memory[base]
                 byte2 = memory[(base+1)%256]
                 addr =  (byte2 << 8) | byte1
-                res = self.register_a - memory[addr]
+                tosub = (memory[addr]^0b11111111)%256
+                res = self.register_a + tosub + 1
             elif opcode==0xD1: #(Indirect,)Y
                 base = memory[self.pc]
                 byte1 = memory[base]
                 byte2 = memory[(base+1)%256]
                 addr =  ((byte2 << 8) | byte1)
                 addr = (addr + self.register_y)%65536
-                res = self.register_a - memory[addr]
+                tosub = (memory[addr]^0b11111111)%256
+                res = self.register_a + tosub + 1
             # Handle overflow, and set the flag
-            if res < 0:
+            if res >= 256:
+                res %= 256
                 self.status |= 0b00000001 # Carry flag
+                iscarry2 = 1
             else:
                 self.status &= 0b11111110
             if res == 0x0:
@@ -507,11 +517,11 @@ class CPU:
         #CPY
         if opcode in [0xC0, 0xC4, 0xCC]:
             res = 0
-            if opcode==0xC9: #Immediate
+            if opcode==0xC0: #Immediate
                 res = self.register_y - memory[self.pc]
-            elif opcode==0xC5: #Zero Page
+            elif opcode==0xC4: #Zero Page
                 res = self.register_y - memory[memory[self.pc]]
-            elif opcode==0xCD: #Abosolute
+            elif opcode==0xCC: #Abosolute
                 byte1 = memory[(self.pc)%65536]
                 byte2 = memory[(self.pc+1)%65536]
                 addr =  byte2 << 8 | byte1
@@ -632,9 +642,9 @@ class CPU:
             elif opcode==0xB8: #CLV
                 self.status = self.status & 0b10111111
             elif opcode==0xD8: #CLD
-                self.status = self.status & 0b11101111
+                self.status = self.status & 0b11110111
             elif opcode==0xF8: #SED
-                self.status = self.status | 0b00010000
+                self.status = self.status | 0b00001000
 
         #INC
         if opcode in [0xE6, 0xF6, 0xEE, 0xFE]:
@@ -689,20 +699,32 @@ class CPU:
                 #OF A PAGE
                 byte1 = memory[self.pc]
                 byte2 = memory[self.pc+1]
-                addr =  byte2 << 8 | byte1
-                #todo
-                #self.pc = memory[(addr&0xFF00)<<8 | (addr+1)%0x100] << 8 | memory[addr]
+                addr1 = (byte2 << 8) | byte1
+                addr2 = (byte2 << 8) | ((byte1+1)%256)
+                b1 = memory[addr1]
+                b2 = memory[addr2]
+                addr = (b2 << 8) | b1
+                self.pc = addr
             #print("JMP")
         #JSR
         if opcode in [0x20]:
+            self.pc+=1
+            self.pc %= 65536
+            tmp = self.pc 
+            memory[self.sp+0x100] = (self.pc & 0xff00) >> 8
+            self.sp = (self.sp-1)%256
+
+            self.pc-=1
+            self.pc %= 65536
             byte1 = memory[self.pc]
             byte2 = memory[self.pc+1]
             addr =  byte2 << 8 | byte1
-            self.pc+=1
-            memory[self.sp+0x100] = (self.pc & 0xff00) >> 8
-            memory[self.sp-1+0x100] = (self.pc & 0xff)
-            self.sp -= 2
             self.pc = addr
+
+            memory[self.sp+0x100] = (tmp & 0xff)
+            self.sp = (self.sp-1)%256
+
+
             #print("JSR")
         #LDA
         if opcode in [0xA9, 0xA5, 0xB5, 0xAD, 0xBD, 0xB9, 0xA1, 0xB1]:
@@ -1226,6 +1248,7 @@ class CPU:
                 self.sp = self.register_x
             elif opcode==0xBA: #TSX
                 self.register_x = self.sp
+                res = self.register_x
             elif opcode==0x48: #PHA
                 memory[self.sp+0x100] = self.register_a
                 self.sp-=1
@@ -1326,14 +1349,15 @@ if __name__=="__main__":
     if len(sys.argv)<=1:
         exit()
     if sys.argv[1]=="run":
-        print("implemented:", len(opToLen))
+        #print("implemented:", len(opToLen))
         pg.init()
         screen = pg.display.set_mode((640, 480))
         color = [[255, 255, 255] for i in range(256)]
         color[0] = [0, 0, 0]
         colors = np.array(color)
         toRend = np.array(memory[0x0200:0x0600], dtype = np.int32)
-        gridarray = np.reshape(toRend, (32, 32))
+        gridarray = np.reshape(toRend, (32, 32), order='F')
+        #print('g ',gridarray[1][0])
         surface = pg.surfarray.make_surface(colors[gridarray])
         surface = pg.transform.scale(surface, (400, 400))
         clock = pg.time.Clock()
@@ -1345,13 +1369,28 @@ if __name__=="__main__":
         load_game()
         running = True
         while running:
+            #print(memory[0xff])
             memory[0xfe] = random.randint(1, 255)
             #render image
             for event in pg.event.get():
                 if event.type == pg.QUIT:
                     running = False
+            keys = pg.key.get_pressed()
+            #print(keys)
+            if keys[pg.K_LEFT]:
+                memory[0xff] = 0x61
+                #print("a")
+            elif keys[pg.K_RIGHT]:
+                memory[0xff] = 0x64
+                #print("d")
+            elif keys[pg.K_UP]:
+                memory[0xff] = 0x77
+                #print("w")
+            elif keys[pg.K_DOWN]:
+                memory[0xff] = 0x73
+                #print("s")
             toRend = np.array(memory[0x0200:0x0600], dtype = np.int32)
-            gridarray = np.reshape(toRend, (32, 32))
+            gridarray = np.reshape(toRend, (32, 32), order='F')
             #for x in range(0x200, 0x300):
             #print((memory[0x0000:0x0030]))
             #print((memory[0x01F0:0x0200]))
@@ -1363,9 +1402,9 @@ if __name__=="__main__":
             pg.display.flip()
             cpu.run()
             #clock.tick(60)
-            inp = input("wait")
-            if inp=='m':
-                print("mem content:", memory[:0x20])
+            #inp = input("wait")
+            #if inp=='m':
+            #    print("mem content:", memory[:0x20])
             #time.sleep(1)
     elif argv[1]=="test":
         testset = implemented

@@ -20,3 +20,7 @@ Harte test set
 snake game 0x641 0x719
 還得再深入了解 ADC SBC 實作，雖然現在被我矇對了
 架構肯定得改寫，提高附用率，重複造太多輪子了
+
+run:
+python .\cpu.py test
+python .\cpu.py testone CC
