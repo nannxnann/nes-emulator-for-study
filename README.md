@@ -4,6 +4,7 @@ nes emulator for study purpose
 https://www.nesdev.org/obelisk-6502-guide/reference.html
 http://www.6502.org/tutorials/6502opcodes.html
 https://bugzmanov.github.io/nes_ebook/chapter_3.html
+https://www.cnblogs.com/chzarles/articles/15816145.html
 
 to verify snake game:
 PC 696 CMP <= Carry flag
