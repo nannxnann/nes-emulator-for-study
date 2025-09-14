@@ -8,8 +8,8 @@ chrom = []
 # to be implemented
 class PPU:
     reg = 0
-    reg_internal_vramaddr # 16bit address
-    reg_internal_readbuffer # only changed after ppudata read
+    reg_internal_vramaddr = 0 # 16bit address
+    reg_internal_readbuffer = 0 # only changed after ppudata read
     reg_internal_v = 0  # 
     reg_internal_t = 0  # 
     reg_internal_x = 0  # 
@@ -23,6 +23,22 @@ class PPU:
     reg_vramaddr = 0 # $2006 write
     reg_vramdata = 0 # $2007 read/write
     reg_dma = 0      # $4014 write
+    def trigger_nmi(self):
+        pass
+    def write_ctrl(self, data):
+        old = self.reg_ctrl
+        self.reg_ctrl = (data&0xff)
+        # nmi trigger immediatly if vblank of PPUSTATUS = 1
+        if reg_ctrl&0b10000000 and not (old&0b10000000) and self.reg_status&0b10000000:
+            #todo trigger nmi
+            self.trigger_nmi()
+
+    def write_mask(self, data):
+        self.reg_mask = (data&0xff)
+    
+    def read_status(self):
+        return self.reg_status
+            
     def write_vramaddr(self, data):
         data &= 0b11111111
         if reg_internal_w == 0:
@@ -31,7 +47,7 @@ class PPU:
         else:
             reg_internal_vramaddr &= 0b1111111100000000
             reg_internal_vramaddr |= data
-            
+    
     def read_vramdata(self):
         read_addr = self.reg_internal_vramaddr
         addr_inc = True if (self.reg_ctrl&0b00000100) else False
@@ -67,7 +83,7 @@ if __name__=="__main__":
         binaryData = f.read()
         #print(binaryData)
         chrom = list(binaryData)
-        chrom = chrom[(16384+16+1):(16384+16+8096+1)]
+        chrom = chrom[(16384+16):(16384+16+8192)]
     print(''.join('{:02x} '.format(x) for x in chrom[:8]))
     tbl = {0:0, 1: 90, 2: 180, 3: 255}
     fig, ax = plt.subplots()
@@ -80,14 +96,21 @@ if __name__=="__main__":
     #    im.set_data(new_array)
     #    return [im]
     #ani = FuncAnimation(fig, update, frames=range(100), interval=1000, blit=True)
+
+    # chrrom [0x0 .. 0x2000] 8K
+    # each tile is a 8*8 pixel image
+    # each pixel is represent in chrrom with 2 bits
+    # a tile is 8*8*2 = 128 bits = 16 bytes
+    # let's render them
     nparr = np.zeros((32*8, 16*8))
-    for x in range(16*32):
+    for x in range(32*16): # total 16*32 tiles
         r = x//16
         c = x%16
-        for i in range(64):
-            bit0 = 1 if (chrom[x*2+i//8] & 1 << (i%8)) else 0
-            bit1 = 1 if (chrom[x*2+1+i//8] & 1 << (i%8)) else 0
+        for i in range(64): # display a tile, pixel 0's bit0 = 0 bit in the 16 bytes, bit1 = 64 bit in the 16 bytes
+            bit0 = 1 if (chrom[x*16+i//8] & (1 << (7-i%8))) else 0
+            bit1 = 1 if (chrom[x*16+8+i//8] & (1 << (7-i%8))) else 0
             #print(x, bit1<<1+bit0, bit1, bit0)
-            nparr[r*8+i//8][c*8+i%8] = tbl[bit1*2+bit0]
+            nparr[r*8+i//8][c*8+i%8] = tbl[bit1*2+bit0] # show in np image
+            #print(r*8+i//8, c*8+i%8)
     im = ax.imshow(nparr, cmap='gray')
     plt.show()
