@@ -7,6 +7,10 @@ chrom = []
 
 # to be implemented
 class PPU:
+    frame = 0
+    cycle = 0
+    scanline = 0 # which line currently ppu render to (262*341)
+    nmi_triggered = 0
     reg = 0
     reg_internal_vramaddr = 0 # 16bit address
     reg_internal_readbuffer = 0 # only changed after ppudata read
@@ -23,8 +27,15 @@ class PPU:
     reg_vramaddr = 0 # $2006 write
     reg_vramdata = 0 # $2007 read/write
     reg_dma = 0      # $4014 write
+    
+    # since there's a dependency "cpu -> ppu" exist, we can't actively notify cpu nmi happened
     def trigger_nmi(self):
-        pass
+        self.is_nmi_triggered = 1
+    
+    # cpu instead call poll_nmi after every instruction done, to see if nmi happened
+    def poll_nmi(self):
+        return nmi_triggered==1
+
     def write_ctrl(self, data):
         old = self.reg_ctrl
         self.reg_ctrl = (data&0xff)
@@ -75,7 +86,28 @@ class PPU:
         else:
             reg_internal_vramaddr &= 0b1111111100000000
             reg_internal_vramaddr |= data
-#todo: 目前完成 render chrom (但好像有bug need fix)
+    def tick(self, cycle):
+        # 262 * 341
+        self.cycle += cycle
+        if self.cycle >= 341:
+            self.cycle %= 341
+            self.scanline += 1
+        if self.scanline >= 262:
+            self.scanline %= 262
+            self.frame+=1
+            # reset vblank flag
+            self.reg_status &= 0b01111111
+
+        # nmi is triggered at line 241 (idx from 0)
+        # scanline 241, dot 1
+        if self.scanline == 241:
+            self.trigger_nmi()
+            self.reg_status |= 0b10000000
+            # todo render image while every line of current frame have been scan over
+        
+        
+        
+        
 # 先嘗試把 ROM 內的 pattern 打印出來
 if __name__=="__main__":
     # load cartridge (之後得獨立出來，這裡是為了演是方便先 load ppu 內容 CHROM)
@@ -84,7 +116,7 @@ if __name__=="__main__":
         #print(binaryData)
         chrom = list(binaryData)
         chrom = chrom[(16384+16):(16384+16+8192)]
-    print(''.join('{:02x} '.format(x) for x in chrom[:8]))
+    #print(''.join('{:02x} '.format(x) for x in chrom[:8]))
     tbl = {0:0, 1: 90, 2: 180, 3: 255}
     fig, ax = plt.subplots()
     # Initialize an image plot with a dummy array

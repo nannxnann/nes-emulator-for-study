@@ -17,10 +17,11 @@ status 更新待驗證
 snake game 目前一路走到 PC 0x641 都正確
 
 todo:
-Harte test set
-snake game 0x641 0x719
 還得再深入了解 ADC SBC 實作，雖然現在被我矇對了
 架構肯定得改寫，提高附用率，重複造太多輪子了
+extra cpu cycle 判斷 - cross page
+cpu memory mapping
+harte test set test cpu cycle
 
 run:
 python .\cpu.py test

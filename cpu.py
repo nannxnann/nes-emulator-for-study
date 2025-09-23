@@ -156,14 +156,32 @@ class CPU:
  #   def fetch():
  #   def decode():
  #   def execute():
-    
+    # 2 cpu cycle
+    def handle_nmi(self):
+        # save pc to stack
+        self.sp-=1
+        self.sp%=256
+        memory[self.sp+0x100] = self.pc&0xff
+        self.sp-=1
+        self.sp%=256
+        memory[self.sp+0x100] = ((self.pc&0xff00)>>8)
+        #save status to stack
+        memory[self.sp+0x100] = self.status
+        # disable interrupt
+        self.status |= 0b000001000
+        # jump to nmi handler
+        self.pc = memory[0xfffb]<<8+memory[0xfffa]
+
+    # return cycle it takes
     def run(self):
         #fetch opcode
         opcode = memory[self.pc]
         #DEBUG
         #print("==============================================")
         #print("PC=", hex(cpu.pc), "opcode=", hex(opcode))
-
+        
+        # do we need extra cycle due to the cross page
+        extra_cycle = 0
         self.pc+=1
         self.pc %= (65536)
         #decode & execute
@@ -194,12 +212,16 @@ class CPU:
                 addr =  byte2 << 8 | byte1
                 toadd = memory[(addr+self.register_x)%65536]
                 self.register_a += (memory[(addr+self.register_x)%65536]+ iscarry)
+                if ((((addr+self.register_x)%65536)&0xff00) != ((addr)&0xff00)):
+                    extra_cycle = 1
             elif opcode==0x79: #Abosolute,Y
                 byte1 = memory[(self.pc)%65536]
                 byte2 = memory[(self.pc+1)%65536]
                 addr =  byte2 << 8 | byte1
                 toadd = memory[(addr+self.register_y)%65536]
                 self.register_a += (memory[(addr+self.register_y)%65536]+ iscarry)
+                if ((((addr+self.register_y)%65536)&0xff00) != ((addr)&0xff00)):
+                    extra_cycle = 1
             elif opcode==0x61: #(Indirect,X)
                 base = (memory[self.pc] + self.register_x)%256
                 byte1 = memory[base]
@@ -215,6 +237,8 @@ class CPU:
                 addr = (addr + self.register_y)%65536
                 toadd = memory[addr]
                 self.register_a += (memory[addr] + iscarry)
+                if ((((addr+self.register_y)%65536)&0xff00) != ((addr)&0xff00)):
+                    extra_cycle = 1
             # Handle overflow, and set the flag
             iscarry2 = 0
             if self.register_a >= 256:
@@ -1500,5 +1524,62 @@ if __name__=="__main__":
             #for err in error:
                 #print(err)
             print(test, "correct",len(js) - len(error), "wrong", len(error))
+    elif sys.argv[1]=="runppu":
+        #print("implemented:", len(opToLen))
+        pg.init()
+        screen = pg.display.set_mode((640, 480))
+        color = [[255, 255, 255] for i in range(256)]
+        color[0] = [0, 0, 0]
+        colors = np.array(color)
+        toRend = np.array(memory[0x0200:0x0600], dtype = np.int32)
+        gridarray = np.reshape(toRend, (32, 32), order='F')
+        #print('g ',gridarray[1][0])
+        surface = pg.surfarray.make_surface(colors[gridarray])
+        surface = pg.transform.scale(surface, (400, 400))
+        clock = pg.time.Clock()
 
+        cpu = CPU()
+        cpu.pc = 0x600
+        #memory[0xff] = 0x77
+        memory[0xfe] = random.randint(1, 255)
+        load_game()
+        running = True
+        while running:
+            #print(memory[0xff])
+            memory[0xfe] = random.randint(1, 255)
+            #render image
+            for event in pg.event.get():
+                if event.type == pg.QUIT:
+                    running = False
+            keys = pg.key.get_pressed()
+            #print(keys)
+            if keys[pg.K_LEFT]:
+                memory[0xff] = 0x61
+                #print("a")
+            elif keys[pg.K_RIGHT]:
+                memory[0xff] = 0x64
+                #print("d")
+            elif keys[pg.K_UP]:
+                memory[0xff] = 0x77
+                #print("w")
+            elif keys[pg.K_DOWN]:
+                memory[0xff] = 0x73
+                #print("s")
+            toRend = np.array(memory[0x0200:0x0600], dtype = np.int32)
+            gridarray = np.reshape(toRend, (32, 32), order='F')
+            #for x in range(0x200, 0x300):
+            #print((memory[0x0000:0x0030]))
+            #print((memory[0x01F0:0x0200]))
+            #print(sum(memory[0x0200:0x0600]))
+            surface = pg.surfarray.make_surface(colors[gridarray])
+            surface = pg.transform.scale(surface, (400, 400))
+            screen.fill((30, 30, 30))
+            screen.blit(surface, (0, 0))
+            pg.display.flip()
+            cpu.run()
+            #clock.tick(60)
+            #inp = input("wait")
+            #if inp=='m':
+            #    print("mem content:", memory[:0x20])
+            #time.sleep(1)
     print("init cpu")
