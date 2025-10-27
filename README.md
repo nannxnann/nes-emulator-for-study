@@ -14,7 +14,6 @@ NOTE:
 status 更新待驗證
 數值計算應該採用 2's complement
 
-snake game 目前一路走到 PC 0x641 都正確
 
 todo:
 還得再深入了解 ADC SBC 實作，雖然現在被我矇對了

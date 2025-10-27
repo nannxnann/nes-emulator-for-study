@@ -5,8 +5,9 @@ import random
 import sys
 import json
 
-# this is the implementation that connect memory to ppu
-# which may not pass harte test
+# this is the implementation of 6502 cpu without unofficial instructions.
+# and the cpu bus did not connect to ppu.
+# which can pass the Harte test
 
 implemented = ["69", "65", "75", "6D", "7D", "79", "61", "71", #ADC
            "29", "25", "35", "2D", "3D", "39", "21", "31", #AND
@@ -106,41 +107,6 @@ opToTime = {0x69:2, 0x65:3, 0x75:4, 0x6D:4, 0x7D:4+1, 0x79:4+1, 0x61:6, 0x71:5+1
             0x84:3, 0x94:4, 0x8C:4 #STY
             }  
 
-#addrmode 0: Immediate, 1: Zero Page, 2: Zero PageX, 3: Absolute, 4: AbsoluteX, 5: AbsoluteY, 6: (Inderect,X), 7:(Inderect,)Y 
-op_to_mode = {
-            0x69:2, 0x65:3, 0x75:4, 0x6D:4, 0x7D:4+1, 0x79:4+1, 0x61:6, 0x71:5+1, #ADC
-            0x29:0, 0x25:1, 0x35:2, 0x2D:3, 0x3D:4, 0x39:5, 0x21:6, 0x31:7,#AND ok
-            0x0A:2, 0x06:5, 0x16:6, 0x0E:6, 0x1E:7, #ASL
-            0x10:2+1+2, 0x30:2+1+2, 0x50:2+1+2, 0x70:2+1+2, 0x90:2+1+2, 0xB0:2+1+2, 0xD0:2+1+2, 0xF0:2+1+2, #BRANCH
-            0x24:3, 0x2C:4, #BIT
-            0x00:7, #BRK
-            0xC9:2, 0xC5:3, 0xD5:4, 0xCD:4, 0xDD:4+1, 0xD9:4+1, 0xC1:6, 0xD1:5+1, #CMP
-            0xE0:2, 0xE4:3, 0xEC:4, #CPX
-            0xC0:2, 0xC4:3, 0xCC:4, #CPY
-            0xC6:5, 0xD6:6, 0xCE:6, 0xDE:7, #DEC
-            0x49:0, 0x45:1, 0x55:2, 0x4D:3, 0x5D:4, 0x59:5, 0x41:6, 0x51:7, #EOR ok
-            0x18:2, 0x38:2, 0x58:2, 0x78:2, 0xB8:2, 0xD8:2, 0xF8:2, #FLAG
-            0xE6:5, 0xF6:6, 0xEE:6, 0xFE:7, #INC
-            0x4C:3, 0x6C:5, #JMP
-            0x20:6, #JSR
-            0xA9:0, 0xA5:1, 0xB5:2, 0xAD:3, 0xBD:4, 0xB9:5, 0xA1:6, 0xB1:7, #LDA ok
-            0xA2:3, 0xA6:3, 0xB6:4, 0xAE:4, 0xBE:4+1, #LDX
-            0xA0:2, 0xA4:3, 0xB4:4, 0xAC:4, 0xBC:4+1, #LDY
-            0x4A:2, 0x46:5, 0x56:6, 0x4E:6, 0x5E:7, #LSR
-            0xEA:2, #NOP
-            0x09:2, 0x05:3, 0x15:4, 0x0D:4, 0x1D:4+1, 0x19:4+1, 0x01:6, 0x11:5, #ORA
-            0xAA:2, 0x8A:2, 0xCA:2, 0xE8:2, 0xA8:2, 0x98:2, 0x88:2, 0xC8:2, #Register Instructions
-            0x2A:2, 0x26:5, 0x36:6, 0x2E:6, 0x3E:7, #ROL
-            0x6A:2, 0x66:5, 0x76:6, 0x6E:6, 0x7E:7, #ROR
-            0x40:6, #RTI
-            0x60:6, #RTS
-            0xE9:2, 0xE5:3, 0xF5:4, 0xED:4, 0xFD:4+1, 0xF9:4+1, 0xE1:6, 0xF1:5+1, #SBC
-            0x85:3, 0x95:4, 0x8D:4, 0x9D:5, 0x99:5, 0x81:6, 0x91:6, #STA
-            0x9A:2, 0xBA:2, 0x48:3, 0x68:4, 0x08:3, 0x28:4, #STACK INSTRUCTION
-            0x86:3, 0x96:4, 0x8E:4, #STX
-            0x84:3, 0x94:4, 0x8C:4 #STY
-             }
-
 gamecode = [0x20, 0x06, 0x06, 0x20, 0x38, 0x06, 0x20, 0x0d, 0x06, 0x20, 0x2a, 0x06, 0x60, 0xa9, 0x02, 0x85,
     0x02, 0xa9, 0x04, 0x85, 0x03, 0xa9, 0x11, 0x85, 0x10, 0xa9, 0x10, 0x85, 0x12, 0xa9, 0x0f, 0x85,
     0x14, 0xa9, 0x04, 0x85, 0x11, 0x85, 0x13, 0x85, 0x15, 0x60, 0xa5, 0xfe, 0x85, 0x00, 0xa5, 0xfe,
@@ -172,7 +138,6 @@ memory = [0b0] * (65536*2) #65536 ~= 64k
 class BUS:
     def __init__(self):
         pass
-        #print("cpu bus init done")
     def write(self, addr, data):
         memory[addr%65536] = data
     def read(self, addr):
@@ -187,7 +152,7 @@ class CPU:
         self.register_x = 0b0         # 8 bit
         self.register_y = 0b0         # 8 bit
         self.status = 0b00110000      # 8 bit  
-        self.bus = BUS()
+        
         #status
         #NV1B DIZC
         #|||| ||||
@@ -219,49 +184,8 @@ class CPU:
         # jump to nmi handler
         self.pc = memory[0xfffb]<<8+memory[0xfffa]
     # give addressing mode return address
-
-    # addrmode 0: Immediate, 1: Zero Page, 2: Zero PageX, 3: Absolute, 4: AbsoluteX, 5: AbsoluteY, 6: (Inderect,X), 7:(Inderect,)Y 
-    # get target address by giving addressing mode and pc+1
-    def get_target_addr(self, mode):
-        #Immediate
-        if mode==0:
-            return self.pc
-        #Zero Page
-        elif mode==1:
-            return self.bus.read(self.pc)
-        #Zero PageX
-        elif mode==2:
-            return (self.bus.read(self.pc)+self.register_x)%256
-        #Absolute
-        elif mode==3:
-            byte1 = self.bus.read(self.pc%65536)
-            byte2 = self.bus.read((self.pc+1)%65536)
-            return (byte2<<8) | byte1
-        #AbsoluteX
-        elif mode==4:
-            byte1 = self.bus.read(self.pc%65536)
-            byte2 = self.bus.read((self.pc+1)%65536)
-            addr = (byte2<<8) | byte1
-            return (addr+self.register_x)%65536
-        #AbsoluteY
-        elif mode==5:
-            byte1 = self.bus.read(self.pc%65536)
-            byte2 = self.bus.read((self.pc+1)%65536)
-            addr = (byte2<<8) | byte1
-            return (addr+self.register_y)%65536
-        #(Inderect,X)
-        elif mode==6:
-            base = (self.bus.read(self.pc)+self.register_x)%256
-            byte1 = self.bus.read(base)
-            byte2 = self.bus.read((base+1)%256)
-            return (byte2<<8) | byte1
-        #(Inderect,)Y 
-        elif mode==7:
-            base = self.bus.read(self.pc)
-            byte1 = self.bus.read(base)
-            byte2 = self.bus.read((base+1)%256)
-            addr = (byte2<<8) | byte1
-            return (addr + self.register_y)%65536
+    def addressing_mode(self, mode, pc):
+        pass
         
     # return cycle it takes
     def run(self):
@@ -361,9 +285,41 @@ class CPU:
             #print("ADC")
         #AND
         if opcode in [0x29, 0x25, 0x35, 0x2D, 0x3D, 0x39, 0x21, 0x31]:
-            target_addr = self.get_target_addr(op_to_mode[opcode])
-            oprand = self.bus.read(target_addr)
-            self.register_a &= oprand
+            if opcode==0x29: #Immediate
+                self.register_a &= memory[self.pc]
+            elif opcode==0x25: #Zero Page
+                self.register_a &= memory[memory[self.pc]]
+            elif opcode==0x35: #Zero Page X
+                addr = (memory[self.pc]+self.register_x)%256
+                self.register_a &= memory[addr]
+            elif opcode==0x2D: #Abosolute
+                byte1 = memory[(self.pc)%65536]
+                byte2 = memory[(self.pc+1)%65536]
+                addr =  byte2 << 8 | byte1
+                self.register_a &= memory[addr]
+            elif opcode==0x3D: #Abosolute,X
+                byte1 = memory[(self.pc)%65536]
+                byte2 = memory[(self.pc+1)%65536]
+                addr =  byte2 << 8 | byte1
+                self.register_a &= memory[(addr+self.register_x)%65536]
+            elif opcode==0x39: #Abosolute,Y
+                byte1 = memory[(self.pc)%65536]
+                byte2 = memory[(self.pc+1)%65536]
+                addr =  byte2 << 8 | byte1
+                self.register_a &= memory[(addr+self.register_y)%65536]
+            elif opcode==0x21: #(Indirect,X)
+                base = (memory[self.pc] + self.register_x)%256
+                byte1 = memory[base]
+                byte2 = memory[(base+1)%256]
+                addr =  (byte2 << 8) | byte1
+                self.register_a &= memory[addr]
+            elif opcode==0x31: #(Indirect,)Y
+                base = memory[self.pc]
+                byte1 = memory[base]
+                byte2 = memory[(base+1)%256]
+                addr =  ((byte2 << 8) | byte1)
+                addr = (addr + self.register_y)%65536
+                self.register_a &= memory[addr]
             if self.register_a == 0x0:
                 self.status = self.status | 0b00000010
             else:
@@ -664,9 +620,41 @@ class CPU:
             #print("DEC")
         #EOR
         if opcode in [0x49, 0x45, 0x55, 0x4D, 0x5D, 0x59, 0x41, 0x51]:
-            target_addr = self.get_target_addr(op_to_mode[opcode])
-            oprand = self.bus.read(target_addr)
-            self.register_a ^= oprand
+            if opcode==0x49: #Immediate
+                self.register_a ^= memory[self.pc]
+            elif opcode==0x45: #Zero Page
+                self.register_a ^= memory[memory[self.pc]]
+            elif opcode==0x55: #Zero Page X
+                addr = (memory[self.pc]+self.register_x)%256
+                self.register_a ^= memory[addr]
+            elif opcode==0x4D: #Abosolute
+                byte1 = memory[(self.pc)%65536]
+                byte2 = memory[(self.pc+1)%65536]
+                addr =  byte2 << 8 | byte1
+                self.register_a ^= memory[addr]
+            elif opcode==0x5D: #Abosolute,X
+                byte1 = memory[(self.pc)%65536]
+                byte2 = memory[(self.pc+1)%65536]
+                addr =  byte2 << 8 | byte1
+                self.register_a ^= memory[(addr+self.register_x)%65536]
+            elif opcode==0x59: #Abosolute,Y
+                byte1 = memory[(self.pc)%65536]
+                byte2 = memory[(self.pc+1)%65536]
+                addr =  byte2 << 8 | byte1
+                self.register_a ^= memory[(addr+self.register_y)%65536]
+            elif opcode==0x41: #(Indirect,X)
+                base = (memory[self.pc] + self.register_x)%256
+                byte1 = memory[base]
+                byte2 = memory[(base+1)%256]
+                addr =  (byte2 << 8) | byte1
+                self.register_a ^= memory[addr]
+            elif opcode==0x51: #(Indirect,)Y
+                base = memory[self.pc]
+                byte1 = memory[base]
+                byte2 = memory[(base+1)%256]
+                addr =  ((byte2 << 8) | byte1)
+                addr = (addr + self.register_y)%65536
+                self.register_a ^= memory[addr]
             self.register_a &= (0b11111111) # make sure a register has only 1 byte
             if self.register_a == 0x0:
                 self.status = self.status | 0b00000010
@@ -779,10 +767,45 @@ class CPU:
             #print("JSR")
         #LDA
         if opcode in [0xA9, 0xA5, 0xB5, 0xAD, 0xBD, 0xB9, 0xA1, 0xB1]:
-            target_addr = self.get_target_addr(op_to_mode[opcode])
-            oprand = self.bus.read(target_addr)
             #print(hex(opcode), hex(memory[self.pc]), memory[self.pc])
-            self.register_a = oprand
+            if opcode==0xA9: #Immediate
+                byte1 = memory[self.pc]
+                self.register_a = byte1
+            elif opcode==0xA5: #Zero Page
+                byte1 = memory[memory[self.pc]]
+                self.register_a = byte1
+            elif opcode==0xB5: #Zero Page X
+                addr = (memory[self.pc]+self.register_x)%256
+                byte1 = memory[addr]
+                self.register_a = byte1
+            elif opcode==0xAD: #Abosolute
+                byte1 = memory[(self.pc)%65536]
+                byte2 = memory[(self.pc+1)%65536]
+                add =  byte2 << 8 | byte1
+                self.register_a = memory[add]
+            elif opcode==0xBD: #Abosolute,X
+                byte1 = memory[(self.pc)%65536]
+                byte2 = memory[(self.pc+1)%65536]
+                add =  byte2 << 8 | byte1
+                self.register_a = memory[(add+self.register_x)%65536]
+            elif opcode==0xB9: #Abosolute,Y
+                byte1 = memory[(self.pc)%65536]
+                byte2 = memory[(self.pc+1)%65536]
+                add =  byte2 << 8 | byte1
+                self.register_a = memory[(add+self.register_y)%65536]
+            elif opcode==0xA1: #(Indirect,X)
+                base = (memory[self.pc] + self.register_x)%256
+                byte1 = memory[base]
+                byte2 = memory[(base+1)%256]
+                addr =  (byte2 << 8) | byte1
+                self.register_a = memory[addr]
+            elif opcode==0xB1: #(Indirect,)Y
+                base = memory[self.pc]
+                byte1 = memory[base]
+                byte2 = memory[(base+1)%256]
+                addr =  ((byte2 << 8) | byte1)
+                addr = (addr + self.register_y)%65536
+                self.register_a = memory[addr]
             if self.register_a == 0x0:
                     self.status = self.status | 0b00000010
             else:
