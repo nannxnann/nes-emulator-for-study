@@ -125,10 +125,10 @@ op_to_mode = {
             0x20:6, #JSR
             0xA9:0, 0xA5:1, 0xB5:2, 0xAD:3, 0xBD:4, 0xB9:5, 0xA1:6, 0xB1:7, #LDA ok
             0xA2:3, 0xA6:3, 0xB6:4, 0xAE:4, 0xBE:4+1, #LDX
-            0xA0:2, 0xA4:3, 0xB4:4, 0xAC:4, 0xBC:4+1, #LDY
-            0x4A:2, 0x46:5, 0x56:6, 0x4E:6, 0x5E:7, #LSR
-            0xEA:2, #NOP
-            0x09:2, 0x05:3, 0x15:4, 0x0D:4, 0x1D:4+1, 0x19:4+1, 0x01:6, 0x11:5, #ORA
+            0xA0:0, 0xA4:1, 0xB4:2, 0xAC:3, 0xBC:4, #LDY ok
+            0x4A:0, 0x46:1, 0x56:2, 0x4E:3, 0x5E:4, #LSR ok
+            0xEA:2, #NOP ok
+            0x09:0, 0x05:1, 0x15:2, 0x0D:3, 0x1D:4, 0x19:5, 0x01:6, 0x11:7, #ORA ok
             0xAA:2, 0x8A:2, 0xCA:2, 0xE8:2, 0xA8:2, 0x98:2, 0x88:2, 0xC8:2, #Register Instructions
             0x2A:2, 0x26:5, 0x36:6, 0x2E:6, 0x3E:7, #ROL
             0x6A:2, 0x66:5, 0x76:6, 0x6E:6, 0x7E:7, #ROR
@@ -825,23 +825,10 @@ class CPU:
             #print("LDX")
         #LDY
         if opcode in [0xA0, 0xA4, 0xB4, 0xAC, 0xBC]:
-            if opcode==0xA0: #Immediate
-                self.register_y = memory[self.pc]
-            elif opcode==0xA4: #Zero Page
-                self.register_y = memory[memory[self.pc]]
-            elif opcode==0xB4: #Zero Page X
-                addr = (memory[self.pc]+self.register_x)%256
-                self.register_y = memory[addr]
-            elif opcode==0xAC: #Abosolute
-                byte1 = memory[(self.pc)%65536]
-                byte2 = memory[(self.pc+1)%65536]
-                addr =  byte2 << 8 | byte1
-                self.register_y = memory[addr]
-            elif opcode==0xBC: #Abosolute,X
-                byte1 = memory[(self.pc)%65536]
-                byte2 = memory[(self.pc+1)%65536]
-                addr =  byte2 << 8 | byte1
-                self.register_y = memory[(addr+self.register_x)%65536]
+            target_addr = self.get_target_addr(op_to_mode[opcode])
+            oprand = self.bus.read(target_addr)
+            self.register_y = oprand
+            
             if self.register_y == 0x0:
                 self.status = self.status | 0b00000010
             else:
@@ -855,35 +842,19 @@ class CPU:
             #print("LDY")
         #LSR
         if opcode in [0x4A, 0x46, 0x56, 0x4E, 0x5E]:
+            target_addr = self.get_target_addr(op_to_mode[opcode])
+            oprand = self.bus.read(target_addr)
             bit0 = 0
             res = 0
             if opcode==0x4A: #Accumulator
                 bit0 = self.register_a&0b00000001
                 self.register_a >>= 1
                 res = self.register_a
-            elif opcode==0x46: #Zero Page
-                bit0 = memory[memory[self.pc]]&0b00000001
-                memory[memory[self.pc]] >>= 1
-                res = memory[memory[self.pc]]
-            elif opcode==0x56: #Zero Page X
-                addr = (memory[self.pc]+self.register_x)%256
-                bit0 = memory[addr]&0b00000001
-                memory[addr] >>= 1
-                res = memory[addr]
-            elif opcode==0x4E: #Abosolute
-                byte1 = memory[(self.pc)%65536]
-                byte2 = memory[(self.pc+1)%65536]
-                addr =  byte2 << 8 | byte1
-                bit0 = memory[addr] & 0b00000001
-                memory[addr] >>= 1
-                res = memory[addr]
-            elif opcode==0x5E: #Abosolute,X
-                byte1 = memory[(self.pc)%65536]
-                byte2 = memory[(self.pc+1)%65536]
-                addr =  byte2 << 8 | byte1
-                bit0 = memory[(addr+self.register_x)%65536]  & 0b00000001
-                memory[(addr+self.register_x)%65536] >>= 1
-                res = memory[(addr+self.register_x)%65536]
+            else: #Zero Page
+                bit0 = oprand&0b00000001
+                oprand >>= 1
+                self.bus.write(target_addr, oprand)
+                res = oprand
             # Handle overflow, and set the flag
             if bit0:
                 self.status |= 0b00000001 # Carry flag
@@ -903,41 +874,9 @@ class CPU:
             #print("NOP")
         #ORA
         if opcode in [0x09, 0x05, 0x15, 0x0D, 0x1D, 0x19, 0x01, 0x11]:
-            if opcode==0x09: #Immediate
-                self.register_a |= memory[self.pc]
-            elif opcode==0x05: #Zero Page
-                self.register_a |= memory[memory[self.pc]]
-            elif opcode==0x15: #Zero Page X
-                addr = (memory[self.pc]+self.register_x)%256
-                self.register_a |= memory[addr]
-            elif opcode==0x0D: #Abosolute
-                byte1 = memory[(self.pc)%65536]
-                byte2 = memory[(self.pc+1)%65536]
-                addr =  byte2 << 8 | byte1
-                self.register_a |= memory[addr]
-            elif opcode==0x1D: #Abosolute,X
-                byte1 = memory[(self.pc)%65536]
-                byte2 = memory[(self.pc+1)%65536]
-                addr =  byte2 << 8 | byte1
-                self.register_a |= memory[(addr+self.register_x)%65536]
-            elif opcode==0x19: #Abosolute,Y
-                byte1 = memory[(self.pc)%65536]
-                byte2 = memory[(self.pc+1)%65536]
-                addr =  byte2 << 8 | byte1
-                self.register_a |= memory[(addr+self.register_y)%65536]
-            elif opcode==0x01: #(Indirect,X)
-                base = (memory[self.pc] + self.register_x)%256
-                byte1 = memory[base]
-                byte2 = memory[(base+1)%256]
-                addr =  (byte2 << 8) | byte1
-                self.register_a |= memory[addr]
-            elif opcode==0x11: #(Indirect,)Y
-                base = memory[self.pc]
-                byte1 = memory[base]
-                byte2 = memory[(base+1)%256]
-                addr =  ((byte2 << 8) | byte1)
-                addr = (addr + self.register_y)%65536
-                self.register_a |= memory[addr]
+            target_addr = self.get_target_addr(op_to_mode[opcode])
+            oprand = self.bus.read(target_addr)
+            self.register_a |= oprand
             if self.register_a == 0x0:
                 self.status = self.status | 0b00000010
             else:
