@@ -106,39 +106,40 @@ opToTime = {0x69:2, 0x65:3, 0x75:4, 0x6D:4, 0x7D:4+1, 0x79:4+1, 0x61:6, 0x71:5+1
             0x84:3, 0x94:4, 0x8C:4 #STY
             }  
 
-#addrmode 0: Immediate, 1: Zero Page, 2: Zero PageX, 3: Absolute, 4: AbsoluteX, 5: AbsoluteY, 6: (Inderect,X), 7:(Inderect,)Y 
+#addrmode 0: Immediate, 1: Zero Page, 2: Zero PageX, 3: Absolute, 4: AbsoluteX, 5: AbsoluteY,
+#6: (Inderect,X), 7:(Inderect,)Y, 8:accumulate, 9:Inderect, 10: Zero PageY
 op_to_mode = {
-            0x69:2, 0x65:3, 0x75:4, 0x6D:4, 0x7D:4+1, 0x79:4+1, 0x61:6, 0x71:5+1, #ADC
+            0x69:0, 0x65:1, 0x75:2, 0x6D:3, 0x7D:4, 0x79:5, 0x61:6, 0x71:7, #ADC ok
             0x29:0, 0x25:1, 0x35:2, 0x2D:3, 0x3D:4, 0x39:5, 0x21:6, 0x31:7,#AND ok
-            0x0A:2, 0x06:5, 0x16:6, 0x0E:6, 0x1E:7, #ASL
-            0x10:2+1+2, 0x30:2+1+2, 0x50:2+1+2, 0x70:2+1+2, 0x90:2+1+2, 0xB0:2+1+2, 0xD0:2+1+2, 0xF0:2+1+2, #BRANCH
-            0x24:3, 0x2C:4, #BIT
-            0x00:7, #BRK
-            0xC9:2, 0xC5:3, 0xD5:4, 0xCD:4, 0xDD:4+1, 0xD9:4+1, 0xC1:6, 0xD1:5+1, #CMP
-            0xE0:2, 0xE4:3, 0xEC:4, #CPX
-            0xC0:2, 0xC4:3, 0xCC:4, #CPY
-            0xC6:5, 0xD6:6, 0xCE:6, 0xDE:7, #DEC
+            0x0A:8, 0x06:1, 0x16:2, 0x0E:3, 0x1E:4, #ASL ok
+            0x10:2+1+2, 0x30:2+1+2, 0x50:2+1+2, 0x70:2+1+2, 0x90:2+1+2, 0xB0:2+1+2, 0xD0:2+1+2, 0xF0:2+1+2, #BRANCH ?
+            0x24:1, 0x2C:3, #BIT ok
+            0x00:7, #BRK ?
+            0xC9:0, 0xC5:1, 0xD5:2, 0xCD:3, 0xDD:4, 0xD9:5, 0xC1:6, 0xD1:7, #CMP ok
+            0xE0:0, 0xE4:1, 0xEC:3, #CPX ok
+            0xC0:0, 0xC4:1, 0xCC:3, #CPY ok
+            0xC6:1, 0xD6:2, 0xCE:3, 0xDE:4, #DEC ok
             0x49:0, 0x45:1, 0x55:2, 0x4D:3, 0x5D:4, 0x59:5, 0x41:6, 0x51:7, #EOR ok
-            0x18:2, 0x38:2, 0x58:2, 0x78:2, 0xB8:2, 0xD8:2, 0xF8:2, #FLAG
-            0xE6:5, 0xF6:6, 0xEE:6, 0xFE:7, #INC
-            0x4C:3, 0x6C:5, #JMP
-            0x20:6, #JSR
+            0x18:2, 0x38:2, 0x58:2, 0x78:2, 0xB8:2, 0xD8:2, 0xF8:2, #FLAG ?
+            0xE6:1, 0xF6:2, 0xEE:3, 0xFE:4, #INC ok
+            0x4C:3, 0x6C:9, #JMP ok
+            0x20:6, #JSR ?
             0xA9:0, 0xA5:1, 0xB5:2, 0xAD:3, 0xBD:4, 0xB9:5, 0xA1:6, 0xB1:7, #LDA ok
-            0xA2:3, 0xA6:3, 0xB6:4, 0xAE:4, 0xBE:4+1, #LDX
+            0xA2:0, 0xA6:1, 0xB6:10, 0xAE:3, 0xBE:5, #LDX ok
             0xA0:0, 0xA4:1, 0xB4:2, 0xAC:3, 0xBC:4, #LDY ok
             0x4A:0, 0x46:1, 0x56:2, 0x4E:3, 0x5E:4, #LSR ok
             0xEA:2, #NOP ok
             0x09:0, 0x05:1, 0x15:2, 0x0D:3, 0x1D:4, 0x19:5, 0x01:6, 0x11:7, #ORA ok
-            0xAA:2, 0x8A:2, 0xCA:2, 0xE8:2, 0xA8:2, 0x98:2, 0x88:2, 0xC8:2, #Register Instructions
-            0x2A:2, 0x26:5, 0x36:6, 0x2E:6, 0x3E:7, #ROL
-            0x6A:2, 0x66:5, 0x76:6, 0x6E:6, 0x7E:7, #ROR
-            0x40:6, #RTI
-            0x60:6, #RTS
-            0xE9:2, 0xE5:3, 0xF5:4, 0xED:4, 0xFD:4+1, 0xF9:4+1, 0xE1:6, 0xF1:5+1, #SBC
-            0x85:3, 0x95:4, 0x8D:4, 0x9D:5, 0x99:5, 0x81:6, 0x91:6, #STA
-            0x9A:2, 0xBA:2, 0x48:3, 0x68:4, 0x08:3, 0x28:4, #STACK INSTRUCTION
-            0x86:3, 0x96:4, 0x8E:4, #STX
-            0x84:3, 0x94:4, 0x8C:4 #STY
+            0xAA:2, 0x8A:2, 0xCA:2, 0xE8:2, 0xA8:2, 0x98:2, 0x88:2, 0xC8:2, #Register Instructions ?
+            0x2A:8, 0x26:1, 0x36:2, 0x2E:3, 0x3E:4, #ROL ok
+            0x6A:8, 0x66:1, 0x76:2, 0x6E:3, 0x7E:4, #ROR ok
+            0x40:6, #RTI ?
+            0x60:6, #RTS ?
+            0xE9:0, 0xE5:1, 0xF5:2, 0xED:3, 0xFD:4, 0xF9:5, 0xE1:6, 0xF1:7, #SBC ok
+            0x85:1, 0x95:2, 0x8D:3, 0x9D:4, 0x99:5, 0x81:6, 0x91:7, #STA ok
+            0x9A:2, 0xBA:2, 0x48:3, 0x68:4, 0x08:3, 0x28:4, #STACK INSTRUCTION ?
+            0x86:1, 0x96:10, 0x8E:3, #STX ok
+            0x84:1, 0x94:2, 0x8C:3 #STY ok
              }
 
 gamecode = [0x20, 0x06, 0x06, 0x20, 0x38, 0x06, 0x20, 0x0d, 0x06, 0x20, 0x2a, 0x06, 0x60, 0xa9, 0x02, 0x85,
@@ -223,6 +224,7 @@ class CPU:
     # addrmode 0: Immediate, 1: Zero Page, 2: Zero PageX, 3: Absolute, 4: AbsoluteX, 5: AbsoluteY, 6: (Inderect,X), 7:(Inderect,)Y 
     # get target address by giving addressing mode and pc+1
     def get_target_addr(self, mode):
+        extra_cycle = 0
         #Immediate
         if mode==0:
             return self.pc
@@ -242,12 +244,17 @@ class CPU:
             byte1 = self.bus.read(self.pc%65536)
             byte2 = self.bus.read((self.pc+1)%65536)
             addr = (byte2<<8) | byte1
+            if ((((addr+self.register_x)%65536)&0xff00) != ((addr)&0xff00)):
+                extra_cycle = 1
             return (addr+self.register_x)%65536
+            
         #AbsoluteY
         elif mode==5:
             byte1 = self.bus.read(self.pc%65536)
             byte2 = self.bus.read((self.pc+1)%65536)
             addr = (byte2<<8) | byte1
+            if ((((addr+self.register_y)%65536)&0xff00) != ((addr)&0xff00)):
+                extra_cycle = 1
             return (addr+self.register_y)%65536
         #(Inderect,X)
         elif mode==6:
@@ -261,8 +268,24 @@ class CPU:
             byte1 = self.bus.read(base)
             byte2 = self.bus.read((base+1)%256)
             addr = (byte2<<8) | byte1
+            if ((((addr+self.register_y)%65536)&0xff00) != ((addr)&0xff00)):
+                extra_cycle = 1
             return (addr + self.register_y)%65536
-        
+        #ACCUMULATOR
+        elif mode==8:
+            return 0
+        #INDERECT
+        elif mode==9:
+            byte1 = self.bus.read(self.pc)
+            byte2 = self.bus.read(self.pc+1)
+            addr1 = (byte2 << 8) | byte1
+            addr2 = (byte2 << 8) | ((byte1+1)%256)
+            b1 = self.bus.read(addr1)
+            b2 = self.bus.read(addr2)
+            return (b2 << 8) | b1
+        #Zero PageY
+        elif mode==10:
+            return (self.bus.read(self.pc)+self.register_y)%256
     # return cycle it takes
     def run(self):
         #fetch opcode
@@ -278,58 +301,12 @@ class CPU:
         #decode & execute
         #ADC
         if opcode in [0x69, 0x65, 0x75, 0x6D, 0x7D, 0x79, 0x61, 0x71]:
+            target_addr = self.get_target_addr(op_to_mode[opcode])
+            oprand = self.bus.read(target_addr)
             origin = self.register_a
-            toadd = 0
             iscarry = self.status & 0b00000001
-            if opcode==0x69: #Immediate
-                toadd = memory[self.pc]
-                self.register_a = (self.register_a + memory[self.pc] + iscarry)
-            elif opcode==0x65: #Zero Page
-                toadd = memory[memory[self.pc]]
-                self.register_a += (memory[memory[self.pc]]+ iscarry)
-            elif opcode==0x75: #Zero Page X
-                addr = (memory[self.pc]+self.register_x)%256
-                toadd = memory[addr]
-                self.register_a += (memory[addr]+ iscarry)
-            elif opcode==0x6D: #Abosolute
-                byte1 = memory[(self.pc)%65536]
-                byte2 = memory[(self.pc+1)%65536]
-                addr =  byte2 << 8 | byte1
-                toadd = memory[addr]
-                self.register_a += (memory[addr]+ iscarry)
-            elif opcode==0x7D: #Abosolute,X
-                byte1 = memory[(self.pc)%65536]
-                byte2 = memory[(self.pc+1)%65536]
-                addr =  byte2 << 8 | byte1
-                toadd = memory[(addr+self.register_x)%65536]
-                self.register_a += (memory[(addr+self.register_x)%65536]+ iscarry)
-                if ((((addr+self.register_x)%65536)&0xff00) != ((addr)&0xff00)):
-                    extra_cycle = 1
-            elif opcode==0x79: #Abosolute,Y
-                byte1 = memory[(self.pc)%65536]
-                byte2 = memory[(self.pc+1)%65536]
-                addr =  byte2 << 8 | byte1
-                toadd = memory[(addr+self.register_y)%65536]
-                self.register_a += (memory[(addr+self.register_y)%65536]+ iscarry)
-                if ((((addr+self.register_y)%65536)&0xff00) != ((addr)&0xff00)):
-                    extra_cycle = 1
-            elif opcode==0x61: #(Indirect,X)
-                base = (memory[self.pc] + self.register_x)%256
-                byte1 = memory[base]
-                byte2 = memory[(base+1)%256]
-                addr =  (byte2 << 8) | byte1
-                toadd = memory[addr]
-                self.register_a += (memory[addr]+ iscarry)
-            elif opcode==0x71: #(Indirect,)Y
-                base = memory[self.pc]
-                byte1 = memory[base]
-                byte2 = memory[(base+1)%256]
-                addr =  ((byte2 << 8) | byte1)
-                addr = (addr + self.register_y)%65536
-                toadd = memory[addr]
-                self.register_a += (memory[addr] + iscarry)
-                if ((((addr+self.register_y)%65536)&0xff00) != ((addr)&0xff00)):
-                    extra_cycle = 1
+            toadd = oprand
+            self.register_a = (self.register_a + oprand + iscarry)
             # Handle overflow, and set the flag
             iscarry2 = 0
             if self.register_a >= 256:
@@ -384,33 +361,15 @@ class CPU:
                 self.register_a <<= 1
                 res = self.register_a
                 self.register_a &= 0b11111111
-            elif opcode==0x06: #Zero Page
-                bit7 = memory[memory[self.pc]]&0b10000000
-                memory[memory[self.pc]] <<= 1
-                res = memory[memory[self.pc]]
-                memory[memory[self.pc]] &= 0b11111111
-            elif opcode==0x16: #Zero Page X
-                addr = (memory[self.pc]+self.register_x)%256
-                bit7 = memory[addr] & 0b10000000
-                memory[addr] <<= 1
-                res = memory[addr]
-                memory[addr] &= 0b11111111
-            elif opcode==0x0E: #Abosolute
-                byte1 = memory[(self.pc)%65536]
-                byte2 = memory[(self.pc+1)%65536]
-                addr =  byte2 << 8 | byte1
-                bit7 = memory[addr]&0b10000000
-                memory[addr] <<= 1
-                res = memory[addr]
-                memory[addr] &= 0b11111111
-            elif opcode==0x1E: #Abosolute,X
-                byte1 = memory[(self.pc)%65536]
-                byte2 = memory[(self.pc+1)%65536]
-                addr =  byte2 << 8 | byte1
-                bit7 = memory[(addr+self.register_x)%65536]&0b10000000
-                memory[(addr+self.register_x)%65536] <<= 1
-                res = memory[(addr+self.register_x)%65536]
-                memory[(addr+self.register_x)%65536] &= 0b11111111
+            else: #other
+                target_addr = self.get_target_addr(op_to_mode[opcode])
+                oprand = self.bus.read(target_addr)
+                bit7 = oprand&0b10000000
+                oprand <<= 1
+                oprand &= 0b11111111
+                self.bus.write(target_addr, oprand)
+                res = oprand
+
             # Handle overflow, and set the flag
             if bit7 & 0b10000000:
                 self.status |= 0b00000001 # Carry flag
@@ -430,16 +389,10 @@ class CPU:
         #BIT
         if opcode in [0x24, 0x2C]:
             res = 0
-            tested = 0
-            if opcode==0x24: #Zero Page
-                tested = memory[memory[self.pc]]
-                res = self.register_a & tested
-            elif opcode==0x2C: #Absolute
-                byte1 = memory[(self.pc)%65536]
-                byte2 = memory[(self.pc+1)%65536]
-                addr =  byte2 << 8 | byte1
-                tested = memory[addr]
-                res = self.register_a & tested
+            target_addr = self.get_target_addr(op_to_mode[opcode])
+            oprand = self.bus.read(target_addr)
+            tested = oprand
+            res = self.register_a & tested
             if res == 0x0:
                 self.status = self.status | 0b00000010
             else:
@@ -508,50 +461,11 @@ class CPU:
         #CMP
         if opcode in [0xC9, 0xC5, 0xD5, 0xCD, 0xDD, 0xD9, 0xC1, 0xD1]:
             #print("cmp", hex(opcode), "a", hex(self.register_a))
+            target_addr = self.get_target_addr(op_to_mode[opcode])
+            oprand = self.bus.read(target_addr)
             res = 0
-            if opcode==0xC9: #Immediate
-                tosub = ((memory[self.pc]^0b11111111))%256
-                res = self.register_a + tosub + 1
-            elif opcode==0xC5: #Zero Page
-                tosub = (memory[memory[self.pc]]^0b11111111)%256
-                res = self.register_a + tosub + 1
-            elif opcode==0xD5: #Zero Page X
-                addr = (memory[self.pc]+self.register_x)%256
-                tosub = (memory[addr]^0b11111111)%256
-                res = self.register_a + tosub + 1
-            elif opcode==0xCD: #Abosolute
-                byte1 = memory[(self.pc)%65536]
-                byte2 = memory[(self.pc+1)%65536]
-                addr =  byte2 << 8 | byte1
-                tosub = (memory[addr]^0b11111111)%256
-                res = self.register_a + tosub + 1
-            elif opcode==0xDD: #Abosolute,X
-                byte1 = memory[(self.pc)%65536]
-                byte2 = memory[(self.pc+1)%65536]
-                addr =  byte2 << 8 | byte1
-                tosub = (memory[(addr+self.register_x)%65536] ^0b11111111)%256
-                res = self.register_a + tosub + 1
-            elif opcode==0xD9: #Abosolute,Y
-                byte1 = memory[(self.pc)%65536]
-                byte2 = memory[(self.pc+1)%65536]
-                addr =  byte2 << 8 | byte1
-                tosub = (memory[(addr+self.register_y)%65536]^0b11111111)%256
-                res = self.register_a + tosub + 1
-            elif opcode==0xC1: #(Indirect,X)
-                base = (memory[self.pc] + self.register_x)%256
-                byte1 = memory[base]
-                byte2 = memory[(base+1)%256]
-                addr =  (byte2 << 8) | byte1
-                tosub = (memory[addr]^0b11111111)%256
-                res = self.register_a + tosub + 1
-            elif opcode==0xD1: #(Indirect,)Y
-                base = memory[self.pc]
-                byte1 = memory[base]
-                byte2 = memory[(base+1)%256]
-                addr =  ((byte2 << 8) | byte1)
-                addr = (addr + self.register_y)%65536
-                tosub = (memory[addr]^0b11111111)%256
-                res = self.register_a + tosub + 1
+            tosub = ((oprand^0b11111111))%256
+            res = self.register_a + tosub + 1
             # Handle overflow, and set the flag
             if res >= 256:
                 res %= 256
@@ -573,15 +487,9 @@ class CPU:
         #CPX
         if opcode in [0xE0, 0xE4, 0xEC]:
             res = 0
-            if opcode==0xE0: #Immediate
-                res = self.register_x - memory[self.pc]
-            elif opcode==0xE4: #Zero Page
-                res = self.register_x - memory[memory[self.pc]]
-            elif opcode==0xEC: #Abosolute
-                byte1 = memory[(self.pc)%65536]
-                byte2 = memory[(self.pc+1)%65536]
-                addr =  byte2 << 8 | byte1
-                res = self.register_x - memory[addr]
+            target_addr = self.get_target_addr(op_to_mode[opcode])
+            oprand = self.bus.read(target_addr)
+            res = self.register_x - oprand
             if res >= 0:
                 self.status |= 0b00000001 # Carry flag
             else:
@@ -600,15 +508,9 @@ class CPU:
         #CPY
         if opcode in [0xC0, 0xC4, 0xCC]:
             res = 0
-            if opcode==0xC0: #Immediate
-                res = self.register_y - memory[self.pc]
-            elif opcode==0xC4: #Zero Page
-                res = self.register_y - memory[memory[self.pc]]
-            elif opcode==0xCC: #Abosolute
-                byte1 = memory[(self.pc)%65536]
-                byte2 = memory[(self.pc+1)%65536]
-                addr =  byte2 << 8 | byte1
-                res = self.register_y - memory[addr]
+            target_addr = self.get_target_addr(op_to_mode[opcode])
+            oprand = self.bus.read(target_addr)
+            res = self.register_y - oprand
             if res >= 0:
                 self.status |= 0b00000001 # Carry flag
             else:
@@ -627,30 +529,12 @@ class CPU:
         #DEC
         if opcode in [0xC6, 0xD6, 0xCE, 0xDE]:
             res = 0
-            if opcode==0xC6: #Zero Page
-                memory[memory[self.pc]] -= 1
-                res = memory[memory[self.pc]]
-                memory[memory[self.pc]] &= 0b11111111
-            elif opcode==0xD6: #Zero Page X
-                #print((memory[self.pc]+self.register_x)%256)
-                addr = (memory[self.pc]+self.register_x)%256
-                memory[addr] -= 1
-                memory[addr] &= 0b11111111
-                res = memory[addr]
-            elif opcode==0xCE: #Abosolute
-                byte1 = memory[(self.pc)%65536]
-                byte2 = memory[(self.pc+1)%65536]
-                addr =  byte2 << 8 | byte1
-                memory[addr] -= 1
-                res = memory[addr]
-                memory[addr] &= 0b11111111
-            elif opcode==0xDE: #Abosolute,X
-                byte1 = memory[(self.pc)%65536]
-                byte2 = memory[(self.pc+1)%65536]
-                addr =  byte2 << 8 | byte1
-                memory[(addr+self.register_x)%65536] -= 1
-                res = memory[(addr+self.register_x)%65536]
-                memory[(addr+self.register_x)%65536] &= 0b11111111
+            target_addr = self.get_target_addr(op_to_mode[opcode])
+            oprand = self.bus.read(target_addr)
+            oprand -= 1
+            res = oprand
+            oprand &= 0b11111111
+            self.bus.write(target_addr, oprand)
             if res == 0x0:
                 self.status = self.status | 0b00000010
             else:
@@ -700,29 +584,13 @@ class CPU:
         #INC
         if opcode in [0xE6, 0xF6, 0xEE, 0xFE]:
             res = 0
-            if opcode==0xE6: #Zero Page
-                memory[memory[self.pc]] += 1
-                res = memory[memory[self.pc]]%256
-                memory[memory[self.pc]] &= 0b11111111
-            elif opcode==0xF6: #Zero Page X
-                addr = (memory[self.pc]+self.register_x)%256
-                memory[addr] += 1
-                res = memory[addr]%256
-                memory[addr] &= 0b11111111
-            elif opcode==0xEE: #Abosolute
-                byte1 = memory[(self.pc)%65536]
-                byte2 = memory[(self.pc+1)%65536]
-                addr =  byte2 << 8 | byte1
-                memory[addr] += 1
-                res = memory[addr]%256
-                memory[addr] &= 0b11111111
-            elif opcode==0xFE: #Abosolute,X
-                byte1 = memory[(self.pc)%65536]
-                byte2 = memory[(self.pc+1)%65536]
-                addr =  byte2 << 8 | byte1
-                memory[(addr+self.register_x)%65536] += 1
-                res = memory[(addr+self.register_x)%65536]%256
-                memory[(addr+self.register_x)%65536] &= 0b11111111
+            target_addr = self.get_target_addr(op_to_mode[opcode])
+            oprand = self.bus.read(target_addr)
+            oprand += 1
+            res = oprand%256
+            oprand &= 0b11111111
+            self.bus.write(target_addr, oprand)
+
             if res == 0x0:
                 self.status = self.status | 0b00000010
             else:
@@ -736,26 +604,8 @@ class CPU:
             #print("INC")
         #JMP
         if opcode in [0x4C, 0x6C]:
-            if opcode==0x4C: #Abosolute
-                
-                byte1 = memory[self.pc]
-                byte2 = memory[self.pc+1]
-                #print("pc",self.pc, "mem",  byte1)
-                #print("pc",self.pc+1, "mem",  byte2)
-                addr =  (byte2 << 8) | byte1
-                self.pc = addr
-            elif opcode==0x6C: #Indirect
-                #AN INDIRECT JUMP MUST NEVER USE A
-                #VECTOR BEGINNING ON THE LAST BYTE
-                #OF A PAGE
-                byte1 = memory[self.pc]
-                byte2 = memory[self.pc+1]
-                addr1 = (byte2 << 8) | byte1
-                addr2 = (byte2 << 8) | ((byte1+1)%256)
-                b1 = memory[addr1]
-                b2 = memory[addr2]
-                addr = (b2 << 8) | b1
-                self.pc = addr
+            target_addr = self.get_target_addr(op_to_mode[opcode])
+            self.pc = target_addr
             #print("JMP")
         #JSR
         if opcode in [0x20]:
@@ -796,22 +646,9 @@ class CPU:
             #print("LDA")
         #LDX
         if opcode in [0xA2, 0xA6, 0xB6, 0xAE, 0xBE]:
-            if opcode==0xA2: #Immediate
-                self.register_x = memory[self.pc]
-            elif opcode==0xA6: #Zero Page
-                self.register_x = memory[memory[self.pc]]
-            elif opcode==0xB6: #Zero Page Y
-                self.register_x = memory[(memory[self.pc]+self.register_y)%256]
-            elif opcode==0xAE: #Abosolute
-                byte1 = memory[(self.pc)%65536]
-                byte2 = memory[(self.pc+1)%65536]
-                addr =  byte2 << 8 | byte1
-                self.register_x = memory[addr]
-            elif opcode==0xBE: #Abosolute,Y
-                byte1 = memory[(self.pc)%65536]
-                byte2 = memory[(self.pc+1)%65536]
-                addr =  byte2 << 8 | byte1
-                self.register_x = memory[(addr+self.register_y)%65536]
+            target_addr = self.get_target_addr(op_to_mode[opcode])
+            oprand = self.bus.read(target_addr)
+            self.register_x = oprand
             if self.register_x == 0x0:
                 self.status = self.status | 0b00000010
             else:
@@ -948,37 +785,15 @@ class CPU:
                 self.register_a |= (self.status & 0b00000001)
                 self.register_a &= 0b11111111
                 res = self.register_a
-            elif opcode==0x26: #Zero Page
-                bit7 = memory[memory[self.pc]] & 0b10000000
-                memory[memory[self.pc]] <<= 1
-                memory[memory[self.pc]] |= (self.status & 0b00000001)
-                memory[memory[self.pc]] &= 0b11111111
-                res = memory[memory[self.pc]]
-            elif opcode==0x36: #Zero Page X
-                addr = (memory[self.pc]+self.register_x)%256
-                bit7 = memory[addr]  & 0b10000000
-                memory[addr] <<= 1
-                memory[addr] |= (self.status & 0b00000001)
-                memory[addr] &= 0b11111111
-                res = memory[addr]
-            elif opcode==0x2E: #Abosolute
-                byte1 = memory[(self.pc)%65536]
-                byte2 = memory[(self.pc+1)%65536]
-                addr =  byte2 << 8 | byte1
-                bit7 = memory[addr] & 0b10000000
-                memory[addr] <<= 1
-                memory[addr] |= (self.status & 0b00000001)
-                memory[addr] &= 0b11111111
-                res = memory[addr]
-            elif opcode==0x3E: #Abosolute,x
-                byte1 = memory[(self.pc)%65536]
-                byte2 = memory[(self.pc+1)%65536]
-                addr =  byte2 << 8 | byte1
-                bit7 = memory[(addr+self.register_x)%65536] & 0b10000000
-                memory[(addr+self.register_x)%65536] <<= 1
-                memory[(addr+self.register_x)%65536] |= (self.status & 0b00000001)
-                memory[(addr+self.register_x)%65536] &= 0b11111111
-                res = memory[(addr+self.register_x)%65536]
+            else: #others
+                target_addr = self.get_target_addr(op_to_mode[opcode])
+                oprand = self.bus.read(target_addr)
+                bit7 = oprand & 0b10000000
+                oprand <<= 1
+                oprand |= (self.status & 0b00000001)
+                oprand &= 0b11111111
+                res = oprand
+                self.bus.write(target_addr, oprand)
             if bit7:
                 self.status |= 0b00000001
             else:
@@ -1004,37 +819,15 @@ class CPU:
                 self.register_a |= ((self.status & 0b00000001)<<7)
                 self.register_a &= 0b11111111
                 res = self.register_a
-            elif opcode==0x66: #Zero Page
-                bit0 = memory[memory[self.pc]] & 0b00000001
-                memory[memory[self.pc]] >>= 1
-                memory[memory[self.pc]] |= ((self.status & 0b00000001)<<7)
-                memory[memory[self.pc]] &= 0b11111111
-                res = memory[memory[self.pc]]
-            elif opcode==0x76: #Zero Page X
-                addr = (memory[self.pc]+self.register_x)%256
-                bit0 = memory[addr] & 0b00000001
-                memory[addr] >>= 1
-                memory[addr] |= ((self.status & 0b00000001)<<7)
-                memory[addr] &= 0b11111111
-                res = memory[addr]
-            elif opcode==0x6E: #Abosolute
-                byte1 = memory[(self.pc)%65536]
-                byte2 = memory[(self.pc+1)%65536]
-                addr =  byte2 << 8 | byte1
-                bit0 = memory[addr] & 0b00000001
-                memory[addr] >>= 1
-                memory[addr] |= ((self.status & 0b00000001)<<7)
-                memory[addr] &= 0b11111111
-                res = memory[addr]
-            elif opcode==0x7E: #Abosolute,x
-                byte1 = memory[(self.pc)%65536]
-                byte2 = memory[(self.pc+1)%65536]
-                addr =  byte2 << 8 | byte1
-                bit0 = memory[(addr+self.register_x)%65536] & 0b00000001
-                memory[(addr+self.register_x)%65536] >>= 1
-                memory[(addr+self.register_x)%65536] |= ((self.status & 0b00000001)<<7)
-                memory[(addr+self.register_x)%65536] &= 0b11111111
-                res = memory[(addr+self.register_x)%65536]
+            else: #Others
+                target_addr = self.get_target_addr(op_to_mode[opcode])
+                oprand = self.bus.read(target_addr)
+                bit0 = oprand & 0b00000001
+                oprand >>= 1
+                oprand |= ((self.status & 0b00000001)<<7)
+                oprand &= 0b11111111
+                res = oprand
+                self.bus.write(target_addr, oprand)
             if bit0:
                 self.status |= 0b00000001
             else:
@@ -1078,51 +871,12 @@ class CPU:
             iscarry = self.status&0b00000001
             #carry = ((carry)^0b11111111+1)%256
             tosub = 0
-            if opcode==0xE9: #Immediate
-                tosub = ((memory[self.pc]^0b11111111))%256
-                #why this not working
-                #ar = ((carry)^0b11111111+1)%256
-                self.register_a = (self.register_a + tosub + iscarry)
-            elif opcode==0xE5: #Zero Page
-                tosub = (memory[memory[self.pc]]^0b11111111)%256
-                self.register_a += (tosub + iscarry)
-            elif opcode==0xF5: #Zero Page X
-                addr = (memory[self.pc]+self.register_x)%256
-                tosub = (memory[addr]^0b11111111)%256
-                self.register_a += (tosub + iscarry)
-            elif opcode==0xED: #Abosolute
-                byte1 = memory[(self.pc)%65536]
-                byte2 = memory[(self.pc+1)%65536]
-                addr =  byte2 << 8 | byte1
-                tosub = (memory[addr]^0b11111111)%256
-                self.register_a += (tosub+ iscarry)
-            elif opcode==0xFD: #Abosolute,X
-                byte1 = memory[(self.pc)%65536]
-                byte2 = memory[(self.pc+1)%65536]
-                addr =  byte2 << 8 | byte1
-                tosub = (memory[(addr+self.register_x)%65536] ^0b11111111)%256
-                self.register_a += (tosub + iscarry)
-            elif opcode==0xF9: #Abosolute,Y
-                byte1 = memory[(self.pc)%65536]
-                byte2 = memory[(self.pc+1)%65536]
-                addr =  byte2 << 8 | byte1
-                tosub = (memory[(addr+self.register_y)%65536]^0b11111111)%256
-                self.register_a += (tosub + iscarry)
-            elif opcode==0xE1: #(Indirect,X)
-                base = (memory[self.pc] + self.register_x)%256
-                byte1 = memory[base]
-                byte2 = memory[(base+1)%256]
-                addr =  (byte2 << 8) | byte1
-                tosub = (memory[addr]^0b11111111)%256
-                self.register_a += (tosub+ iscarry)
-            elif opcode==0xF1: #(Indirect,)Y
-                base = memory[self.pc]
-                byte1 = memory[base]
-                byte2 = memory[(base+1)%256]
-                addr =  ((byte2 << 8) | byte1)
-                addr = (addr + self.register_y)%65536
-                tosub = (memory[addr]^0b11111111)%256
-                self.register_a += (tosub + iscarry)
+            target_addr = self.get_target_addr(op_to_mode[opcode])
+            oprand = self.bus.read(target_addr)
+            tosub = ((oprand^0b11111111))%256
+            #why this not working
+            #ar = ((carry)^0b11111111+1)%256
+            self.register_a = (self.register_a + tosub + iscarry)
             # Handle overflow, and set the flag
             iscarry2 = 0
             if self.register_a >= 256:
@@ -1155,42 +909,10 @@ class CPU:
         #STA
         if opcode in [0x85, 0x95, 0x8D, 0x9D, 0x99, 0x81, 0x91]:
             #print(hex(opcode))
-            if opcode==0x85: #Zero Page
-                #print(memory[self.pc], self.register_a)
-                memory[memory[self.pc]] = self.register_a
-            elif opcode==0x95: #Zero Page X
-                addr = (memory[self.pc]+self.register_x)%256
-                memory[addr] = self.register_a
-            elif opcode==0x8D: #Abosolute
-                byte1 = memory[(self.pc)%65536]
-                byte2 = memory[(self.pc+1)%65536]
-                addr =  byte2 << 8 | byte1
-                memory[addr] = self.register_a
-            elif opcode==0x9D: #Abosolute,X
-                byte1 = memory[(self.pc)%65536]
-                byte2 = memory[(self.pc+1)%65536]
-                addr =  byte2 << 8 | byte1
-                memory[(addr+self.register_x)%65536] = self.register_a
-            elif opcode==0x99: #Abosolute,Y
-                byte1 = memory[(self.pc)%65536]
-                byte2 = memory[(self.pc+1)%65536]
-                addr =  byte2 << 8 | byte1
-                memory[(addr+self.register_y)%65536] = self.register_a
-            elif opcode==0x81: #(Indirect,X)
-                base = (memory[self.pc] + self.register_x)%256
-                byte1 = memory[base]
-                byte2 = memory[(base+1)%256]
-                addr =  (byte2 << 8) | byte1
-                memory[addr] = self.register_a
-                #print("mem",base, byte1, byte2, addr, memory[addr],  hex(addr))
-            elif opcode==0x91: #(Indirect,)Y
-                base = memory[self.pc]
-                byte1 = memory[base]
-                byte2 = memory[(base+1)%256]
-                addr =  ((byte2 << 8) | byte1)
-                addr = (addr + self.register_y)%65536
-                memory[addr] = self.register_a
-                #print("mem", memory[addr + self.register_y],  hex(addr + self.register_y))
+            target_addr = self.get_target_addr(op_to_mode[opcode])
+            #print(memory[self.pc], self.register_a)
+            self.bus.write(target_addr, self.register_a)
+            #print("mem", memory[addr + self.register_y],  hex(addr + self.register_y))
             self.pc += (opToLen[opcode]-1)
             self.pc %= 65536
             #print("STA")
@@ -1238,30 +960,15 @@ class CPU:
             
         #STX
         if opcode in [0x86, 0x96, 0x8E]:
-            if opcode==0x86: #Zero Page
-                memory[memory[self.pc]] = self.register_x
-            elif opcode==0x96: #Zero Page Y
-                memory[(memory[self.pc]+self.register_y)%256] = self.register_x
-            elif opcode==0x8E: #Abosolute
-                byte1 = memory[(self.pc)%65536]
-                byte2 = memory[(self.pc+1)%65536]
-                addr =  byte2 << 8 | byte1
-                memory[addr] = self.register_x
+            target_addr = self.get_target_addr(op_to_mode[opcode])
+            self.bus.write(target_addr, self.register_x)
             self.pc += (opToLen[opcode]-1)
             self.pc %= 65536
             #print("STX")
         #STY
         if opcode in [0x84, 0x94, 0x8C]:
-            if opcode==0x84: #Zero Page
-                memory[memory[self.pc]] = self.register_y
-            elif opcode==0x94: #Zero Page X
-                addr = (memory[self.pc]+self.register_x)%256
-                memory[addr] = self.register_y
-            elif opcode==0x8C: #Abosolute
-                byte1 = memory[(self.pc)%65536]
-                byte2 = memory[(self.pc+1)%65536]
-                addr =  byte2 << 8 | byte1
-                memory[addr] = self.register_y
+            target_addr = self.get_target_addr(op_to_mode[opcode])
+            self.bus.write(target_addr, self.register_y)
             self.pc += (opToLen[opcode]-1)
             self.pc %= 65536
             #print("STY")
