@@ -38,7 +38,9 @@ implemented = ["69", "65", "75", "6D", "7D", "79", "61", "71", #ADC
            "85", "95", "8D", "9D", "99", "81", "91", #STA
            "9A", "BA", "48", "68", "08", "28", #STACK INSTRUCTION
            "86", "96", "8E", #STX
-           "84", "94", "8C" #STY
+           "84", "94", "8C", #STY
+           #unofficial
+           "0B","2B", #AAC
            ]
 
 opToLen = {0x69:2, 0x65:2, 0x75:2, 0x6D:3, 0x7D:3, 0x79:3, 0x61:2, 0x71:2, #ADC
@@ -71,7 +73,9 @@ opToLen = {0x69:2, 0x65:2, 0x75:2, 0x6D:3, 0x7D:3, 0x79:3, 0x61:2, 0x71:2, #ADC
            0x85:2, 0x95:2, 0x8D:3, 0x9D:3, 0x99:3, 0x81:2, 0x91:2, #STA
            0x9A:0, 0xBA:0, 0x48:0, 0x68:0, 0x08:0, 0x28:0, #STACK INSTRUCTION
            0x86:2, 0x96:2, 0x8E:3, #STX
-           0x84:2, 0x94:2, 0x8C:3 #STY
+           0x84:2, 0x94:2, 0x8C:3, #STY
+           #unofficial
+           0x0B:2, 0x2B:2, #AAC
            }  
 opToTime = {0x69:2, 0x65:3, 0x75:4, 0x6D:4, 0x7D:4+1, 0x79:4+1, 0x61:6, 0x71:5+1, #ADC
             0x29:2, 0x25:3, 0x35:4, 0x2D:4, 0x3D:4+1, 0x39:4+1, 0x21:6, 0x31:5+1, #AND
@@ -103,7 +107,9 @@ opToTime = {0x69:2, 0x65:3, 0x75:4, 0x6D:4, 0x7D:4+1, 0x79:4+1, 0x61:6, 0x71:5+1
             0x85:3, 0x95:4, 0x8D:4, 0x9D:5, 0x99:5, 0x81:6, 0x91:6, #STA
             0x9A:2, 0xBA:2, 0x48:3, 0x68:4, 0x08:3, 0x28:4, #STACK INSTRUCTION
             0x86:3, 0x96:4, 0x8E:4, #STX
-            0x84:3, 0x94:4, 0x8C:4 #STY
+            0x84:3, 0x94:4, 0x8C:4, #STY
+            #unofficial
+            0x0B:2, 0x2B:2, #AAC
             }  
 
 #addrmode 0: Immediate, 1: Zero Page, 2: Zero PageX, 3: Absolute, 4: AbsoluteX, 5: AbsoluteY,
@@ -139,7 +145,9 @@ op_to_mode = {
             0x85:1, 0x95:2, 0x8D:3, 0x9D:4, 0x99:5, 0x81:6, 0x91:7, #STA ok
             0x9A:2, 0xBA:2, 0x48:3, 0x68:4, 0x08:3, 0x28:4, #STACK INSTRUCTION ?
             0x86:1, 0x96:10, 0x8E:3, #STX ok
-            0x84:1, 0x94:2, 0x8C:3 #STY ok
+            0x84:1, 0x94:2, 0x8C:3, #STY ok
+            #unofficial
+            0x0B:0, 0x2B:0, #AAC
              }
 
 gamecode = [0x20, 0x06, 0x06, 0x20, 0x38, 0x06, 0x20, 0x0d, 0x06, 0x20, 0x2a, 0x06, 0x60, 0xa9, 0x02, 0x85,
@@ -972,6 +980,25 @@ class CPU:
             self.pc += (opToLen[opcode]-1)
             self.pc %= 65536
             #print("STY")
+
+        # start of illegal instruction
+        #AAC
+        if opcode in [0x0B, 0x2B]:
+            target_addr = self.get_target_addr(op_to_mode[opcode])
+            oprand = self.bus.read(target_addr)
+            self.register_a &= oprand
+            if self.register_a == 0x0:
+                self.status = self.status | 0b00000010
+            else:
+                self.status = self.status & 0b11111101
+            if self.register_a & 0b10000000:
+                self.status = self.status | 0b10000000
+                self.status = self.status | 0b00000001
+            else:
+                self.status = self.status & 0b01111111
+                self.status = self.status & 0b11111110
+            self.pc += (opToLen[opcode]-1)
+            self.pc %= 65536
         #print("new PC=", hex(self.pc), "opcode=", hex(opcode))
         #print('reg.A=', hex(self.register_a))
         #print('reg.X=', hex(self.register_x))
