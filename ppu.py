@@ -111,7 +111,7 @@ class PPU:
 # 先嘗試把 ROM 內的 pattern 打印出來
 if __name__=="__main__":
     # load cartridge (之後得獨立出來，這裡是為了演是方便先 load ppu 內容 CHROM)
-    with open("rom/test1.nes", 'rb') as f:
+    with open("rom/test2.nes", 'rb') as f:
         binaryData = f.read()
         #print(binaryData)
         chrom = list(binaryData)

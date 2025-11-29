@@ -8,6 +8,10 @@ import json
 # this is the implementation that connect memory to ppu
 # which may not pass harte test
 
+no_extra_absx = [0x1E, 0xFE, 0xDE, 0x5E, 0x3E, 0x7E, 0x9D]
+no_extra_absy = [0x99]
+no_extra_indy = [0x91]
+
 implemented = ["69", "65", "75", "6D", "7D", "79", "61", "71", #ADC
            "29", "25", "35", "2D", "3D", "39", "21", "31", #AND
            "0A", "06", "16", "0E", "1E", #ASL
@@ -76,40 +80,44 @@ opToLen = {0x69:2, 0x65:2, 0x75:2, 0x6D:3, 0x7D:3, 0x79:3, 0x61:2, 0x71:2, #ADC
            0x84:2, 0x94:2, 0x8C:3, #STY
            #unofficial
            0x0B:2, 0x2B:2, #AAC
+           0x87:2, 0x97:2, 0x83:2, 0x8F:3, #AAX
+           0x6B:2, #ARR
            }  
-opToTime = {0x69:2, 0x65:3, 0x75:4, 0x6D:4, 0x7D:4+1, 0x79:4+1, 0x61:6, 0x71:5+1, #ADC
-            0x29:2, 0x25:3, 0x35:4, 0x2D:4, 0x3D:4+1, 0x39:4+1, 0x21:6, 0x31:5+1, #AND
+opToTime = {0x69:2, 0x65:3, 0x75:4, 0x6D:4, 0x7D:4, 0x79:4, 0x61:6, 0x71:5, #ADC
+            0x29:2, 0x25:3, 0x35:4, 0x2D:4, 0x3D:4, 0x39:4, 0x21:6, 0x31:5, #AND
             0x0A:2, 0x06:5, 0x16:6, 0x0E:6, 0x1E:7, #ASL
-            0x10:2+1+2, 0x30:2+1+2, 0x50:2+1+2, 0x70:2+1+2, 0x90:2+1+2, 0xB0:2+1+2, 0xD0:2+1+2, 0xF0:2+1+2, #BRANCH
+            0x10:2, 0x30:2, 0x50:2, 0x70:2, 0x90:2, 0xB0:2, 0xD0:2, 0xF0:2, #BRANCH
             0x24:3, 0x2C:4, #BIT
             0x00:7, #BRK
-            0xC9:2, 0xC5:3, 0xD5:4, 0xCD:4, 0xDD:4+1, 0xD9:4+1, 0xC1:6, 0xD1:5+1, #CMP
+            0xC9:2, 0xC5:3, 0xD5:4, 0xCD:4, 0xDD:4, 0xD9:4, 0xC1:6, 0xD1:5, #CMP
             0xE0:2, 0xE4:3, 0xEC:4, #CPX
             0xC0:2, 0xC4:3, 0xCC:4, #CPY
             0xC6:5, 0xD6:6, 0xCE:6, 0xDE:7, #DEC
-            0x49:2, 0x45:3, 0x55:4, 0x4D:4, 0x5D:4+1, 0x59:4+1, 0x41:6, 0x51:5+1, #EOR
+            0x49:2, 0x45:3, 0x55:4, 0x4D:4, 0x5D:4, 0x59:4, 0x41:6, 0x51:5, #EOR
             0x18:2, 0x38:2, 0x58:2, 0x78:2, 0xB8:2, 0xD8:2, 0xF8:2, #FLAG
             0xE6:5, 0xF6:6, 0xEE:6, 0xFE:7, #INC
             0x4C:3, 0x6C:5, #JMP
             0x20:6, #JSR
-            0xA9:2, 0xA5:3, 0xB5:4, 0xAD:4, 0xBD:4+1, 0xB9:4+1, 0xA1:6, 0xB1:5+1, #LDA
-            0xA2:3, 0xA6:3, 0xB6:4, 0xAE:4, 0xBE:4+1, #LDX
-            0xA0:2, 0xA4:3, 0xB4:4, 0xAC:4, 0xBC:4+1, #LDY
+            0xA9:2, 0xA5:3, 0xB5:4, 0xAD:4, 0xBD:4, 0xB9:4, 0xA1:6, 0xB1:5, #LDA
+            0xA2:2, 0xA6:3, 0xB6:4, 0xAE:4, 0xBE:4, #LDX
+            0xA0:2, 0xA4:3, 0xB4:4, 0xAC:4, 0xBC:4, #LDY
             0x4A:2, 0x46:5, 0x56:6, 0x4E:6, 0x5E:7, #LSR
             0xEA:2, #NOP
-            0x09:2, 0x05:3, 0x15:4, 0x0D:4, 0x1D:4+1, 0x19:4+1, 0x01:6, 0x11:5, #ORA
+            0x09:2, 0x05:3, 0x15:4, 0x0D:4, 0x1D:4, 0x19:4, 0x01:6, 0x11:5, #ORA
             0xAA:2, 0x8A:2, 0xCA:2, 0xE8:2, 0xA8:2, 0x98:2, 0x88:2, 0xC8:2, #Register Instructions
             0x2A:2, 0x26:5, 0x36:6, 0x2E:6, 0x3E:7, #ROL
             0x6A:2, 0x66:5, 0x76:6, 0x6E:6, 0x7E:7, #ROR
             0x40:6, #RTI
             0x60:6, #RTS
-            0xE9:2, 0xE5:3, 0xF5:4, 0xED:4, 0xFD:4+1, 0xF9:4+1, 0xE1:6, 0xF1:5+1, #SBC
+            0xE9:2, 0xE5:3, 0xF5:4, 0xED:4, 0xFD:4, 0xF9:4, 0xE1:6, 0xF1:5, #SBC
             0x85:3, 0x95:4, 0x8D:4, 0x9D:5, 0x99:5, 0x81:6, 0x91:6, #STA
             0x9A:2, 0xBA:2, 0x48:3, 0x68:4, 0x08:3, 0x28:4, #STACK INSTRUCTION
             0x86:3, 0x96:4, 0x8E:4, #STX
             0x84:3, 0x94:4, 0x8C:4, #STY
             #unofficial
             0x0B:2, 0x2B:2, #AAC
+            0x87:3, 0x97:4, 0x83:6, 0x8F:4, #AAX
+            0x6B:2, #ARR
             }  
 
 #addrmode 0: Immediate, 1: Zero Page, 2: Zero PageX, 3: Absolute, 4: AbsoluteX, 5: AbsoluteY,
@@ -118,7 +126,7 @@ op_to_mode = {
             0x69:0, 0x65:1, 0x75:2, 0x6D:3, 0x7D:4, 0x79:5, 0x61:6, 0x71:7, #ADC ok
             0x29:0, 0x25:1, 0x35:2, 0x2D:3, 0x3D:4, 0x39:5, 0x21:6, 0x31:7,#AND ok
             0x0A:8, 0x06:1, 0x16:2, 0x0E:3, 0x1E:4, #ASL ok
-            0x10:2+1+2, 0x30:2+1+2, 0x50:2+1+2, 0x70:2+1+2, 0x90:2+1+2, 0xB0:2+1+2, 0xD0:2+1+2, 0xF0:2+1+2, #BRANCH ?
+            0x10:2, 0x30:2, 0x50:2, 0x70:2, 0x90:2, 0xB0:2, 0xD0:2, 0xF0:2, #BRANCH ?
             0x24:1, 0x2C:3, #BIT ok
             0x00:7, #BRK ?
             0xC9:0, 0xC5:1, 0xD5:2, 0xCD:3, 0xDD:4, 0xD9:5, 0xC1:6, 0xD1:7, #CMP ok
@@ -148,6 +156,8 @@ op_to_mode = {
             0x84:1, 0x94:2, 0x8C:3, #STY ok
             #unofficial
             0x0B:0, 0x2B:0, #AAC
+            0x87:1, 0x97:10, 0x83:6, 0x8F:3, #AAX
+            0x6B:0, #ARR
              }
 
 gamecode = [0x20, 0x06, 0x06, 0x20, 0x38, 0x06, 0x20, 0x0d, 0x06, 0x20, 0x2a, 0x06, 0x60, 0xa9, 0x02, 0x85,
@@ -197,6 +207,8 @@ class CPU:
         self.register_y = 0b0         # 8 bit
         self.status = 0b00110000      # 8 bit  
         self.bus = BUS()
+        self.jiffies = 0
+        self.cycle_this_ins = 0 # cycle took for current instruction
         #status
         #NV1B DIZC
         #|||| ||||
@@ -231,8 +243,7 @@ class CPU:
 
     # addrmode 0: Immediate, 1: Zero Page, 2: Zero PageX, 3: Absolute, 4: AbsoluteX, 5: AbsoluteY, 6: (Inderect,X), 7:(Inderect,)Y 
     # get target address by giving addressing mode and pc+1
-    def get_target_addr(self, mode):
-        extra_cycle = 0
+    def get_target_addr(self, mode, opc=None):
         #Immediate
         if mode==0:
             return self.pc
@@ -252,8 +263,8 @@ class CPU:
             byte1 = self.bus.read(self.pc%65536)
             byte2 = self.bus.read((self.pc+1)%65536)
             addr = (byte2<<8) | byte1
-            if ((((addr+self.register_x)%65536)&0xff00) != ((addr)&0xff00)):
-                extra_cycle = 1
+            if ( opc not in no_extra_absx and (((addr+self.register_x)%65536)&0xff00) != ((addr%65536)&0xff00)):
+                self.cycle_this_ins += 1
             return (addr+self.register_x)%65536
             
         #AbsoluteY
@@ -261,8 +272,8 @@ class CPU:
             byte1 = self.bus.read(self.pc%65536)
             byte2 = self.bus.read((self.pc+1)%65536)
             addr = (byte2<<8) | byte1
-            if ((((addr+self.register_y)%65536)&0xff00) != ((addr)&0xff00)):
-                extra_cycle = 1
+            if ( opc not in no_extra_absy and (((addr+self.register_y)%65536)&0xff00) != ((addr)&0xff00)):
+                self.cycle_this_ins += 1
             return (addr+self.register_y)%65536
         #(Inderect,X)
         elif mode==6:
@@ -276,8 +287,8 @@ class CPU:
             byte1 = self.bus.read(base)
             byte2 = self.bus.read((base+1)%256)
             addr = (byte2<<8) | byte1
-            if ((((addr+self.register_y)%65536)&0xff00) != ((addr)&0xff00)):
-                extra_cycle = 1
+            if ( opc not in no_extra_indy and (((addr+self.register_y)%65536)&0xff00) != ((addr)&0xff00)):
+                self.cycle_this_ins += 1
             return (addr + self.register_y)%65536
         #ACCUMULATOR
         elif mode==8:
@@ -303,13 +314,16 @@ class CPU:
         #print("PC=", hex(cpu.pc), "opcode=", hex(opcode))
         
         # do we need extra cycle due to the cross page
-        extra_cycle = 0
-        self.pc+=1
+        if opcode not in opToTime:
+            print("invalid opcode !!!")
+            return
+        self.cycle_this_ins = opToTime[opcode]
+        self.pc += 1
         self.pc %= (65536)
         #decode & execute
         #ADC
         if opcode in [0x69, 0x65, 0x75, 0x6D, 0x7D, 0x79, 0x61, 0x71]:
-            target_addr = self.get_target_addr(op_to_mode[opcode])
+            target_addr = self.get_target_addr(op_to_mode[opcode], opcode)
             oprand = self.bus.read(target_addr)
             origin = self.register_a
             iscarry = self.status & 0b00000001
@@ -346,7 +360,7 @@ class CPU:
             #print("ADC")
         #AND
         if opcode in [0x29, 0x25, 0x35, 0x2D, 0x3D, 0x39, 0x21, 0x31]:
-            target_addr = self.get_target_addr(op_to_mode[opcode])
+            target_addr = self.get_target_addr(op_to_mode[opcode], opcode)
             oprand = self.bus.read(target_addr)
             self.register_a &= oprand
             if self.register_a == 0x0:
@@ -370,7 +384,7 @@ class CPU:
                 res = self.register_a
                 self.register_a &= 0b11111111
             else: #other
-                target_addr = self.get_target_addr(op_to_mode[opcode])
+                target_addr = self.get_target_addr(op_to_mode[opcode], opcode)
                 oprand = self.bus.read(target_addr)
                 bit7 = oprand&0b10000000
                 oprand <<= 1
@@ -397,7 +411,7 @@ class CPU:
         #BIT
         if opcode in [0x24, 0x2C]:
             res = 0
-            target_addr = self.get_target_addr(op_to_mode[opcode])
+            target_addr = self.get_target_addr(op_to_mode[opcode], opcode)
             oprand = self.bus.read(target_addr)
             tested = oprand
             res = self.register_a & tested
@@ -416,7 +430,7 @@ class CPU:
             self.pc += (opToLen[opcode]-1)
             self.pc %= 65536
             #print("BIT")
-        #BRANCH
+        #BRANCH default 2 cycle, +1 if branch, +1 if cross page
         if opcode in [0x10, 0x30, 0x50, 0x70, 0x90, 0xB0, 0xD0, 0xF0]:
             #print("op ", hex(opcode), "staus ", hex(self.status), "offset ", hex(memory[self.pc]), hex(memory[self.pc+1]))
             jump = False
@@ -444,6 +458,9 @@ class CPU:
                 offset=-offset
                 #print("hoho", offset)
             if jump:
+                self.cycle_this_ins += 1
+                if ((((self.pc+offset)%65536)&0xff00) != ((self.pc)&0xff00)):
+                    self.cycle_this_ins += 1
                 self.pc = (self.pc+offset)%65536
             #print("BRANCH")
         #BRK
@@ -469,7 +486,7 @@ class CPU:
         #CMP
         if opcode in [0xC9, 0xC5, 0xD5, 0xCD, 0xDD, 0xD9, 0xC1, 0xD1]:
             #print("cmp", hex(opcode), "a", hex(self.register_a))
-            target_addr = self.get_target_addr(op_to_mode[opcode])
+            target_addr = self.get_target_addr(op_to_mode[opcode], opcode)
             oprand = self.bus.read(target_addr)
             res = 0
             tosub = ((oprand^0b11111111))%256
@@ -495,7 +512,7 @@ class CPU:
         #CPX
         if opcode in [0xE0, 0xE4, 0xEC]:
             res = 0
-            target_addr = self.get_target_addr(op_to_mode[opcode])
+            target_addr = self.get_target_addr(op_to_mode[opcode], opcode)
             oprand = self.bus.read(target_addr)
             res = self.register_x - oprand
             if res >= 0:
@@ -516,7 +533,7 @@ class CPU:
         #CPY
         if opcode in [0xC0, 0xC4, 0xCC]:
             res = 0
-            target_addr = self.get_target_addr(op_to_mode[opcode])
+            target_addr = self.get_target_addr(op_to_mode[opcode], opcode)
             oprand = self.bus.read(target_addr)
             res = self.register_y - oprand
             if res >= 0:
@@ -537,7 +554,7 @@ class CPU:
         #DEC
         if opcode in [0xC6, 0xD6, 0xCE, 0xDE]:
             res = 0
-            target_addr = self.get_target_addr(op_to_mode[opcode])
+            target_addr = self.get_target_addr(op_to_mode[opcode], opcode)
             oprand = self.bus.read(target_addr)
             oprand -= 1
             res = oprand
@@ -556,7 +573,7 @@ class CPU:
             #print("DEC")
         #EOR
         if opcode in [0x49, 0x45, 0x55, 0x4D, 0x5D, 0x59, 0x41, 0x51]:
-            target_addr = self.get_target_addr(op_to_mode[opcode])
+            target_addr = self.get_target_addr(op_to_mode[opcode], opcode)
             oprand = self.bus.read(target_addr)
             self.register_a ^= oprand
             self.register_a &= (0b11111111) # make sure a register has only 1 byte
@@ -592,7 +609,7 @@ class CPU:
         #INC
         if opcode in [0xE6, 0xF6, 0xEE, 0xFE]:
             res = 0
-            target_addr = self.get_target_addr(op_to_mode[opcode])
+            target_addr = self.get_target_addr(op_to_mode[opcode], opcode)
             oprand = self.bus.read(target_addr)
             oprand += 1
             res = oprand%256
@@ -612,7 +629,7 @@ class CPU:
             #print("INC")
         #JMP
         if opcode in [0x4C, 0x6C]:
-            target_addr = self.get_target_addr(op_to_mode[opcode])
+            target_addr = self.get_target_addr(op_to_mode[opcode], opcode)
             self.pc = target_addr
             #print("JMP")
         #JSR
@@ -637,7 +654,7 @@ class CPU:
             #print("JSR")
         #LDA
         if opcode in [0xA9, 0xA5, 0xB5, 0xAD, 0xBD, 0xB9, 0xA1, 0xB1]:
-            target_addr = self.get_target_addr(op_to_mode[opcode])
+            target_addr = self.get_target_addr(op_to_mode[opcode], opcode)
             oprand = self.bus.read(target_addr)
             #print(hex(opcode), hex(memory[self.pc]), memory[self.pc])
             self.register_a = oprand
@@ -654,7 +671,7 @@ class CPU:
             #print("LDA")
         #LDX
         if opcode in [0xA2, 0xA6, 0xB6, 0xAE, 0xBE]:
-            target_addr = self.get_target_addr(op_to_mode[opcode])
+            target_addr = self.get_target_addr(op_to_mode[opcode], opcode)
             oprand = self.bus.read(target_addr)
             self.register_x = oprand
             if self.register_x == 0x0:
@@ -670,7 +687,7 @@ class CPU:
             #print("LDX")
         #LDY
         if opcode in [0xA0, 0xA4, 0xB4, 0xAC, 0xBC]:
-            target_addr = self.get_target_addr(op_to_mode[opcode])
+            target_addr = self.get_target_addr(op_to_mode[opcode], opcode)
             oprand = self.bus.read(target_addr)
             self.register_y = oprand
             
@@ -687,7 +704,7 @@ class CPU:
             #print("LDY")
         #LSR
         if opcode in [0x4A, 0x46, 0x56, 0x4E, 0x5E]:
-            target_addr = self.get_target_addr(op_to_mode[opcode])
+            target_addr = self.get_target_addr(op_to_mode[opcode], opcode)
             oprand = self.bus.read(target_addr)
             bit0 = 0
             res = 0
@@ -719,7 +736,7 @@ class CPU:
             #print("NOP")
         #ORA
         if opcode in [0x09, 0x05, 0x15, 0x0D, 0x1D, 0x19, 0x01, 0x11]:
-            target_addr = self.get_target_addr(op_to_mode[opcode])
+            target_addr = self.get_target_addr(op_to_mode[opcode], opcode)
             oprand = self.bus.read(target_addr)
             self.register_a |= oprand
             if self.register_a == 0x0:
@@ -794,7 +811,7 @@ class CPU:
                 self.register_a &= 0b11111111
                 res = self.register_a
             else: #others
-                target_addr = self.get_target_addr(op_to_mode[opcode])
+                target_addr = self.get_target_addr(op_to_mode[opcode], opcode)
                 oprand = self.bus.read(target_addr)
                 bit7 = oprand & 0b10000000
                 oprand <<= 1
@@ -828,7 +845,7 @@ class CPU:
                 self.register_a &= 0b11111111
                 res = self.register_a
             else: #Others
-                target_addr = self.get_target_addr(op_to_mode[opcode])
+                target_addr = self.get_target_addr(op_to_mode[opcode], opcode)
                 oprand = self.bus.read(target_addr)
                 bit0 = oprand & 0b00000001
                 oprand >>= 1
@@ -879,7 +896,7 @@ class CPU:
             iscarry = self.status&0b00000001
             #carry = ((carry)^0b11111111+1)%256
             tosub = 0
-            target_addr = self.get_target_addr(op_to_mode[opcode])
+            target_addr = self.get_target_addr(op_to_mode[opcode], opcode)
             oprand = self.bus.read(target_addr)
             tosub = ((oprand^0b11111111))%256
             #why this not working
@@ -917,7 +934,7 @@ class CPU:
         #STA
         if opcode in [0x85, 0x95, 0x8D, 0x9D, 0x99, 0x81, 0x91]:
             #print(hex(opcode))
-            target_addr = self.get_target_addr(op_to_mode[opcode])
+            target_addr = self.get_target_addr(op_to_mode[opcode], opcode)
             #print(memory[self.pc], self.register_a)
             self.bus.write(target_addr, self.register_a)
             #print("mem", memory[addr + self.register_y],  hex(addr + self.register_y))
@@ -968,14 +985,14 @@ class CPU:
             
         #STX
         if opcode in [0x86, 0x96, 0x8E]:
-            target_addr = self.get_target_addr(op_to_mode[opcode])
+            target_addr = self.get_target_addr(op_to_mode[opcode], opcode)
             self.bus.write(target_addr, self.register_x)
             self.pc += (opToLen[opcode]-1)
             self.pc %= 65536
             #print("STX")
         #STY
         if opcode in [0x84, 0x94, 0x8C]:
-            target_addr = self.get_target_addr(op_to_mode[opcode])
+            target_addr = self.get_target_addr(op_to_mode[opcode], opcode)
             self.bus.write(target_addr, self.register_y)
             self.pc += (opToLen[opcode]-1)
             self.pc %= 65536
@@ -984,7 +1001,7 @@ class CPU:
         # start of illegal instruction
         #AAC
         if opcode in [0x0B, 0x2B]:
-            target_addr = self.get_target_addr(op_to_mode[opcode])
+            target_addr = self.get_target_addr(op_to_mode[opcode], opcode)
             oprand = self.bus.read(target_addr)
             self.register_a &= oprand
             if self.register_a == 0x0:
@@ -999,6 +1016,49 @@ class CPU:
                 self.status = self.status & 0b11111110
             self.pc += (opToLen[opcode]-1)
             self.pc %= 65536
+        
+        # todo:
+        # AAX - (hart test set 跟 nes wiki 有出入 on status bit N, Z)
+        if opcode in [0x87, 0x97, 0x83, 0x8F]:
+            target_addr = self.get_target_addr(op_to_mode[opcode], opcode)
+            res = self.register_a & self.register_x
+            self.bus.write(target_addr, res)
+            self.pc += (opToLen[opcode]-1)
+            self.pc %= 65536
+        # todo not done yet
+        # ARR not done yet
+        if opcode in [0x6B]:
+            target_addr = self.get_target_addr(op_to_mode[opcode], opcode)
+            oprand = self.bus.read(target_addr)
+            self.register_a &= oprand
+            self.register_a >>= 1
+            self.register_a |= ((self.status & 0b00000001)<<7)
+            if self.status & 0b00000001:
+                self.status &= 0xFE
+            bit5 = 1 if (self.register_a & 0b00100000) else 0
+            bit6 = 1 if (self.register_a & 0b01000000) else 0
+            if bit5:
+                if bit6:
+                    #set C, clear V
+                    self.status |= 0x01
+                    self.status &= 0b10111111
+                else:
+                    #set V, clear C
+                    self.status |= 0x40
+                    self.status &= 0b10111111
+            else:
+                if bit6:
+                    #set C, set V
+                    self.status |= 0x01
+                    self.status |= 0x40
+                else:
+                    #clear C, clear V
+                    self.status &= 0b11111110
+                    self.status &= 0b10111111
+
+            self.pc += (opToLen[opcode]-1)
+            self.pc %= 65536
+        return self.cycle_this_ins
         #print("new PC=", hex(self.pc), "opcode=", hex(opcode))
         #print('reg.A=', hex(self.register_a))
         #print('reg.X=', hex(self.register_x))
@@ -1123,7 +1183,7 @@ if __name__=="__main__":
                     cpu.status = e["initial"]["p"]
                     for m in e["initial"]["ram"]:
                         memory[m[0]] = m[1]
-                    cpu.run()
+                    cycle_took = cpu.run()
                     if cpu.pc != e["final"]["pc"] or cpu.sp != e["final"]["s"] or cpu.register_x != e["final"]["x"] or cpu.register_y != e["final"]["y"] or cpu.status != e["final"]["p"]:
                         error.append(e)
                         continue
@@ -1131,6 +1191,8 @@ if __name__=="__main__":
                         if memory[m[0]]!=m[1]:
                             error.append(e)
                             break
+                    if not cycle_took == len(e["cycles"]):
+                        error.append(e)
                 if len(error):
                     print(test, "correct",len(js) - len(error), "wrong", len(error))
                 if len(error)==0:
@@ -1168,7 +1230,7 @@ if __name__=="__main__":
                 cpu.status = e["initial"]["p"]
                 for m in e["initial"]["ram"]:
                     memory[m[0]] = m[1]
-                cpu.run()
+                cycle_took = cpu.run()
                 if cpu.pc != e["final"]["pc"] or cpu.sp != e["final"]["s"] or cpu.register_x != e["final"]["x"] or cpu.register_y != e["final"]["y"] or cpu.status != e["final"]["p"]:
                     print('init ', e['initial'])
                     print('answ ', e['final'])
@@ -1186,6 +1248,12 @@ if __name__=="__main__":
                         print("=-------------------------------------------------------------=")
                         error.append(e)
                         break
+                if not cycle_took == len(e["cycles"]):
+                    print('init ', e['initial'])
+                    print('answ ', e['final'])
+                    print("cycle diff, ans = ", len(e["cycles"]), " but = ", cycle_took)
+                    print("=-------------------------------------------------------------=")
+                    error.append(e)
             #for err in error:
                 #print(err)
             print(test, "correct",len(js) - len(error), "wrong", len(error))
