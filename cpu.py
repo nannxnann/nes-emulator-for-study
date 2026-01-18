@@ -4,10 +4,11 @@ import time
 import random
 import sys
 import json
+from ppu import PPU
 
 # this is the implementation that connect memory to ppu
 # which may not pass harte test
-
+lst_cycles = 0
 no_extra_absx = [0x1E, 0xFE, 0xDE, 0x5E, 0x3E, 0x7E, 0x9D]
 no_extra_absy = [0x99]
 no_extra_indy = [0x91]
@@ -187,14 +188,77 @@ gamecode = [0x20, 0x06, 0x06, 0x20, 0x38, 0x06, 0x20, 0x0d, 0x06, 0x20, 0x2a, 0x
 #      Not sure if the BRK is implemented right
 
 
-memory = [0b0] * (65536*2) #65536 ~= 64k
+memory = [0b0] * (65536) #65536 ~= 64k
+ppu_rg_map = [i for i in range(0x2000, 0x3FFF)]
+
 class BUS:
-    def __init__(self):
+    def __init__(self, cpu):
+        self.cpu = cpu
         pass
         #print("cpu bus init done")
     def write(self, addr, data):
+        if addr in ppu_rg_map:
+            rg_addr = (addr-0x2000)%8
+            if rg_addr==0:
+                self.cpu.ppu.write_ctrl(data)
+                return
+            elif rg_addr==1:
+                self.cpu.ppu.write_mask(data)
+                return
+            elif rg_addr==2:
+                print("not allow to write ppu reg_status")
+                return
+            elif rg_addr==3:
+                self.cpu.ppu.write_oamaddr(data)
+                print("oops we write reg_oamaddr, better implemented it write")
+                return
+            elif rg_addr==4:
+                self.cpu.ppu.write_oamdata(data)
+                print("Do not write directly to this register in most cases, better implemented it write")
+                return 
+            elif rg_addr==5:
+                print("scroll game not support yet")
+                return self.cpu.ppu.reg_scroll
+            elif rg_addr==6:
+                #print("write_vramaddr")
+                self.cpu.ppu.write_vramaddr(data)
+                return
+            elif rg_addr==7:
+                #print("write_vramdata")
+                self.cpu.ppu.write_vramdata(data)
+                return
+        if addr == 0x4014:
+            print("dma need to be implemented", hex(data))
+            return self.cpu.ppu.reg_dma
         memory[addr%65536] = data
     def read(self, addr):
+        #if addr in ppu_rg_map:
+        if addr in ppu_rg_map:
+            rg_addr = (addr-0x2000)%8
+            if rg_addr==0:
+                print("not allow to read ppu reg_ctrl")
+                return self.cpu.ppu.reg_ctrl
+            elif rg_addr==1:
+                print("not allow to read ppu reg_mask")
+                return self.cpu.ppu.reg_mask
+            elif rg_addr==2:
+                return self.cpu.ppu.read_status()
+            elif rg_addr==3:
+                print("not allow to read ppu reg_oamaddr")
+                return self.cpu.ppu.reg_oamaddr
+            elif rg_addr==4:
+                return self.cpu.ppu.read_oamdata()
+            elif rg_addr==5:
+                print("not allow to read ppu reg_scroll")
+                return self.cpu.ppu.reg_scroll
+            elif rg_addr==6:
+                print("not allow to read ppu reg_vramaddr")
+                return self.cpu.ppu.reg_vramaddr
+            elif rg_addr==7:
+                return self.cpu.ppu.read_vramdata()
+        if addr == 0x4014:
+            print("not allow to read ppu reg_dma")
+            return self.cpu.ppu.reg_dma
         return memory[addr%65536]
         
 
@@ -206,9 +270,10 @@ class CPU:
         self.register_x = 0b0         # 8 bit
         self.register_y = 0b0         # 8 bit
         self.status = 0b00110000      # 8 bit  
-        self.bus = BUS()
+        self.bus = BUS(self)
         self.jiffies = 0
         self.cycle_this_ins = 0 # cycle took for current instruction
+        self.ppu = PPU()
         #status
         #NV1B DIZC
         #|||| ||||
@@ -238,7 +303,8 @@ class CPU:
         # disable interrupt
         self.status |= 0b000001000
         # jump to nmi handler
-        self.pc = memory[0xfffb]<<8+memory[0xfffa]
+        self.pc = memory[0xfffb]<<8|memory[0xfffa]
+        print("nmi jump to ", hex(self.pc))
     # give addressing mode return address
 
     # addrmode 0: Immediate, 1: Zero Page, 2: Zero PageX, 3: Absolute, 4: AbsoluteX, 5: AbsoluteY, 6: (Inderect,X), 7:(Inderect,)Y 
@@ -308,13 +374,15 @@ class CPU:
     # return cycle it takes
     def run(self):
         #fetch opcode
+        #print(self.pc)
         opcode = memory[self.pc]
         #DEBUG
-        #print("==============================================")
-        #print("PC=", hex(cpu.pc), "opcode=", hex(opcode))
+        print("==============================================")
+        print("PC=", hex(cpu.pc), "opcode=", hex(opcode))
         
         # do we need extra cycle due to the cross page
         if opcode not in opToTime:
+            print(hex(self.pc))
             print("invalid opcode !!!")
             return
         self.cycle_this_ins = opToTime[opcode]
@@ -883,7 +951,7 @@ class CPU:
             self.pc = memory[(self.sp+2)%256+0x100]<<8 | memory[(self.sp+1)%256+0x100]
             self.sp += 2
             self.sp%=256
-            #print("RTI")
+            print("RTI")
         #RTS
         if opcode in [0x60]:
             self.pc = ((memory[(self.sp+2)%256+0x100]<<8 | memory[(self.sp+1)%256+0x100]) + 1)%65536
@@ -1085,6 +1153,16 @@ def clear_mem():
         memory[i] = 0
     return
 
+def load_mapper0():
+    with open("rom/test2.nes", 'rb') as f:
+        binaryData = f.read()
+        #print(binaryData)
+        prgrom = list(binaryData)
+        for i in range(16384):
+            memory[0xC000+i] = prgrom[16+i]
+        print(hex(memory[0xFFFC]))
+        print(hex(memory[0xFFFD]))
+
 def load_game():
     for i in range(len(gamecode)):
         memory[0x600+i] = gamecode[i]
@@ -1093,6 +1171,7 @@ def load_game():
 ADC = ["69", "65", "75", "6D", "7D", "79", "61", "71"]
 SBC = ["E9", "E5", "F5", "ED", "FD", "F9", "E1", "F1"]
 
+# snake game for test 6502
 if __name__=="__main__":
     argv = sys.argv
     if len(sys.argv)<=1:
@@ -1215,7 +1294,7 @@ if __name__=="__main__":
                 if test in ADC or test in SBC:     #bypass DECIMAL mode test
                     if e["initial"]["p"] & 0b00001000:
                         continue    
-                #print("batch = ", i)
+                print("batch = ", i)
                 i+=1
                 #print(e)
                 #print(e['name'])
@@ -1257,29 +1336,30 @@ if __name__=="__main__":
             #for err in error:
                 #print(err)
             print(test, "correct",len(js) - len(error), "wrong", len(error))
+    # test whole emulator
     elif sys.argv[1]=="runppu":
         #print("implemented:", len(opToLen))
-        pg.init()
-        screen = pg.display.set_mode((640, 480))
-        color = [[255, 255, 255] for i in range(256)]
-        color[0] = [0, 0, 0]
-        colors = np.array(color)
-        toRend = np.array(memory[0x0200:0x0600], dtype = np.int32)
-        gridarray = np.reshape(toRend, (32, 32), order='F')
+        #pg.init()
+        #screen = pg.display.set_mode((640, 480))
+        #color = [[255, 255, 255] for i in range(256)]
+        #color[0] = [0, 0, 0]
+        #colors = np.array(color)
+        #toRend = np.array(memory[0x0200:0x0600], dtype = np.int32)
+        #gridarray = np.reshape(toRend, (32, 32), order='F')
         #print('g ',gridarray[1][0])
-        surface = pg.surfarray.make_surface(colors[gridarray])
-        surface = pg.transform.scale(surface, (400, 400))
-        clock = pg.time.Clock()
+        #surface = pg.surfarray.make_surface(colors[gridarray])
+        #surface = pg.transform.scale(surface, (400, 400))
+        #clock = pg.time.Clock()
 
         cpu = CPU()
-        cpu.pc = 0x600
-        #memory[0xff] = 0x77
-        memory[0xfe] = random.randint(1, 255)
-        load_game()
+        load_mapper0()
+        cpu.ppu.load_mapper0()
+        cpu.pc = memory[0xFFFD]<<8|memory[0xFFFC]
+        print("pc start at, ", hex(memory[0xFFFD]<<8|memory[0xFFFC]))
+        
         running = True
         while running:
-            #print(memory[0xff])
-            memory[0xfe] = random.randint(1, 255)
+            '''
             #render image
             for event in pg.event.get():
                 if event.type == pg.QUIT:
@@ -1298,21 +1378,13 @@ if __name__=="__main__":
             elif keys[pg.K_DOWN]:
                 memory[0xff] = 0x73
                 #print("s")
-            toRend = np.array(memory[0x0200:0x0600], dtype = np.int32)
-            gridarray = np.reshape(toRend, (32, 32), order='F')
-            #for x in range(0x200, 0x300):
-            #print((memory[0x0000:0x0030]))
-            #print((memory[0x01F0:0x0200]))
-            #print(sum(memory[0x0200:0x0600]))
-            surface = pg.surfarray.make_surface(colors[gridarray])
-            surface = pg.transform.scale(surface, (400, 400))
-            screen.fill((30, 30, 30))
-            screen.blit(surface, (0, 0))
-            pg.display.flip()
-            cpu.run()
-            #clock.tick(60)
-            #inp = input("wait")
-            #if inp=='m':
-            #    print("mem content:", memory[:0x20])
-            #time.sleep(1)
+            '''
+            print("pc=",hex(cpu.pc))
+            if cpu.ppu.is_nmi_triggered:
+                print("handle nmi in cpu")
+                cpu.handle_nmi()
+                cpu.ppu.is_nmi_triggered = 0
+            cpu.ppu.tick(lst_cycles*3)
+            lst_cycles = cpu.run()
+
     print("init cpu")

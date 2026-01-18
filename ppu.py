@@ -7,10 +7,12 @@ chrom = []
 
 # to be implemented
 class PPU:
+    oam = [0 for i in range(256)]
+    is_rend = 0
     frame = 0
     cycle = 0
     scanline = 0 # which line currently ppu render to (262*341)
-    nmi_triggered = 0
+    is_nmi_triggered = 0
     reg = 0
     reg_internal_vramaddr = 0 # 16bit address
     reg_internal_readbuffer = 0 # only changed after ppudata read
@@ -27,7 +29,23 @@ class PPU:
     reg_vramaddr = 0 # $2006 write
     reg_vramdata = 0 # $2007 read/write
     reg_dma = 0      # $4014 write
-    
+    frame = 0
+    # temporary for render ppu background
+    chrom = []
+    tbl = {0:0, 1: 90, 2: 180, 3: 255}
+
+    def load_mapper0(self):
+        with open("rom/test2.nes", 'rb') as f:
+            binaryData = f.read()
+            #print(binaryData)
+            self.chrom = list(binaryData)
+            #load pattern table
+            print("ppu load rom size ", len(self.chrom ))
+            for i in range(8192):
+                ppuMemory[i] = self.chrom [i+16384+16]
+            self.chrom  = self.chrom [(16384+16):(16384+16+8192)]
+
+
     # since there's a dependency "cpu -> ppu" exist, we can't actively notify cpu nmi happened
     def trigger_nmi(self):
         self.is_nmi_triggered = 1
@@ -40,7 +58,7 @@ class PPU:
         old = self.reg_ctrl
         self.reg_ctrl = (data&0xff)
         # nmi trigger immediatly if vblank of PPUSTATUS = 1
-        if reg_ctrl&0b10000000 and not (old&0b10000000) and self.reg_status&0b10000000:
+        if self.reg_ctrl&0b10000000 and not (old&0b10000000) and self.reg_status&0b10000000:
             #todo trigger nmi
             self.trigger_nmi()
 
@@ -48,18 +66,31 @@ class PPU:
         self.reg_mask = (data&0xff)
     
     def read_status(self):
+        self.reg_internal_w = 0
+        self.reg_status &= 0x80 # clear v flag
         return self.reg_status
             
     def write_vramaddr(self, data):
+        print("vramaddr w=", self.reg_internal_w,"internal =", self.reg_internal_vramaddr ,"data=", hex(data))
         data &= 0b11111111
-        if reg_internal_w == 0:
-            reg_internal_vramaddr &= 0b11111111
-            reg_internal_vramaddr |= (data << 8)
+        if self.reg_internal_w == 0:
+            self.reg_internal_vramaddr &= 0b11111111
+            self.reg_internal_vramaddr |= (data << 8)
+            self.reg_internal_w = 1
         else:
-            reg_internal_vramaddr &= 0b1111111100000000
-            reg_internal_vramaddr |= data
-    
+            self.reg_internal_vramaddr &= 0b1111111100000000
+            self.reg_internal_vramaddr |= data
+            self.reg_internal_w = 0
+
+    def write_oamaddr(self, data):
+        self.reg_oamaddr = data & 0b11111111
+    def write_oamdata(self, data):
+        self.reg_oamdata = data & 0b11111111
+        self.oam[self.reg_oamaddr] = self.reg_oamdata
+    def read_oamdata(self):
+        return self.oam[self.reg_oamaddr]
     def read_vramdata(self):
+        print("read_vramdata", hex(write_addr), hex(data))
         read_addr = self.reg_internal_vramaddr
         addr_inc = True if (self.reg_ctrl&0b00000100) else False
         if addr_inc:
@@ -68,8 +99,8 @@ class PPU:
             self.reg_internal_vramaddr+=1
         self.reg_internal_vramaddr &= 0x3fff
         if read_addr < 0x3000:
-            ret = reg_internal_readbuffer
-            reg_internal_readbuffer = ppuMemory[read_addr]
+            ret = self.reg_internal_readbuffer
+            self.reg_internal_readbuffer = ppuMemory[read_addr]
         elif read_addr < 0x3eff:
             print("invlid, why?")
         elif read_addr < 0x3eff:
@@ -79,32 +110,79 @@ class PPU:
             print("unexpected memory access")
         return ret
     def write_vramdata(self, data):
-        data &= 0b11111111
-        if reg_internal_w == 0:
-            reg_internal_vramaddr &= 0b11111111
-            reg_internal_vramaddr |= (data << 8)
+        write_addr = self.reg_internal_vramaddr
+        print("write_vramdata", hex(write_addr), hex(data))
+        if write_addr < 0x3000:
+            ppuMemory[write_addr] = data&0b11111111
+        elif write_addr < 0x3eff:
+            print("invlid, why?")
+        elif write_addr < 0x3eff:
+            print("write pallete")
+            ppuMemory[write_addr] = data&0b11111111
         else:
-            reg_internal_vramaddr &= 0b1111111100000000
-            reg_internal_vramaddr |= data
+            print("unexpected memory access")
+        addr_inc = True if (self.reg_ctrl&0b00000100) else False
+        if addr_inc:
+            self.reg_internal_vramaddr+=32
+        else:
+            self.reg_internal_vramaddr+=1
+        return
+    def render(self):
+        # get status info
+        nametbl_idx = self.reg_ctrl & 0b11
+        bg_pattern_tbl = 0x1000 if (self.reg_ctrl & 0x10) else 0x0000
+        sprite_pattern_tbl = 0x1000 if (self.reg_ctrl & 0x08) else 0x0000
+        sprite_size = self.reg_ctrl & 0x20 # 0 for 8*8, 1 for 8*16
+
+        # init frame
+        fig, ax = plt.subplots()
+        nparr = np.zeros((700, 700))
+        #print(bg_pattern_tbl)
+        # start render 32 * 30 tiles
+        for i in range(960): # total 960 tiles in one frame, took 960 byte in name table
+                               # each tile is one 8x8 pixels graph
+            r = i//32
+            c = i%32
+            idx = 0x2000+(0x400*nametbl_idx)+i
+            #print(hex(idx))
+            pat = ppuMemory[idx]%256
+            #print(pat)
+            #print(self.chrom)
+            #print(pat)
+            for x in range(64): # display a tile, pixel 0's bit0 = 0 bit in the 16 bytes, bit1 = 64 bit in the 16 bytes
+                bit0 = 1 if (self.chrom [pat*16+x//8+bg_pattern_tbl] & (1 << (7-x%8))) else 0
+                bit1 = 1 if (self.chrom [pat*16+8+x//8+bg_pattern_tbl] & (1 << (7-x%8))) else 0
+                #print(x, bit1<<1+bit0, bit1, bit0)
+                nparr[r*8+x//8][c*8+x%8] = self.tbl[bit1*2+bit0] # show in np image
+                #print(r*8+i//8, c*8+i%8)
+        im = ax.imshow(nparr, cmap='gray')
+        plt.show()
+        
+
     def tick(self, cycle):
         # 262 * 341
         self.cycle += cycle
         if self.cycle >= 341:
             self.cycle %= 341
             self.scanline += 1
-        if self.scanline >= 262:
+        if self.scanline >= 262:  
             self.scanline %= 262
             self.frame+=1
             # reset vblank flag
             self.reg_status &= 0b01111111
-
+        
         # nmi is triggered at line 241 (idx from 0)
         # scanline 241, dot 1
-        if self.scanline == 241:
+        if self.scanline == 241 and self.is_rend==0:
+            print(self.frame, self.cycle, self.scanline)
             self.trigger_nmi()
             self.reg_status |= 0b10000000
             # todo render image while every line of current frame have been scan over
-        
+            self.is_rend=1
+            if self.frame>=0:
+                self.render()
+        if self.scanline > 241 and self.is_rend==1:
+            self.is_rend=0
         
         
         
