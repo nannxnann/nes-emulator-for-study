@@ -1,16 +1,23 @@
+import pygame as pg
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 
 ppuMemory = [0b00000000] * (65536*2) # 64K 定址
 chrom = []
-
+testtbl = []
+pg.init()
+screen = pg.display.set_mode((640, 480))
+color = [[i, i, i] for i in range(256)]
+colors = np.array(color)
+clock = pg.time.Clock()
 # to be implemented
 class PPU:
     oam = [0 for i in range(256)]
     is_rend = 0
     frame = 0
-    cycle = 0
+    cycle = 21
+    total_cycles = 21
     scanline = 0 # which line currently ppu render to (262*341)
     is_nmi_triggered = 0
     reg = 0
@@ -55,11 +62,13 @@ class PPU:
         return nmi_triggered==1
 
     def write_ctrl(self, data):
+        #print("write ctrl", hex(data))
         old = self.reg_ctrl
         self.reg_ctrl = (data&0xff)
         # nmi trigger immediatly if vblank of PPUSTATUS = 1
         if self.reg_ctrl&0b10000000 and not (old&0b10000000) and self.reg_status&0b10000000:
             #todo trigger nmi
+            print("nmi triggered by ctrl")
             self.trigger_nmi()
 
     def write_mask(self, data):
@@ -71,7 +80,7 @@ class PPU:
         return self.reg_status
             
     def write_vramaddr(self, data):
-        print("vramaddr w=", self.reg_internal_w,"internal =", self.reg_internal_vramaddr ,"data=", hex(data))
+        #print("vramaddr w=", self.reg_internal_w,"internal =", self.reg_internal_vramaddr ,"data=", hex(data))
         data &= 0b11111111
         if self.reg_internal_w == 0:
             self.reg_internal_vramaddr &= 0b11111111
@@ -90,7 +99,7 @@ class PPU:
     def read_oamdata(self):
         return self.oam[self.reg_oamaddr]
     def read_vramdata(self):
-        print("read_vramdata", hex(write_addr), hex(data))
+        #print("read_vramdata", hex(write_addr), hex(data))
         read_addr = self.reg_internal_vramaddr
         addr_inc = True if (self.reg_ctrl&0b00000100) else False
         if addr_inc:
@@ -111,7 +120,7 @@ class PPU:
         return ret
     def write_vramdata(self, data):
         write_addr = self.reg_internal_vramaddr
-        print("write_vramdata", hex(write_addr), hex(data))
+        #print("write_vramdata", hex(write_addr), hex(data))
         if write_addr < 0x3000:
             ppuMemory[write_addr] = data&0b11111111
         elif write_addr < 0x3eff:
@@ -128,39 +137,61 @@ class PPU:
             self.reg_internal_vramaddr+=1
         return
     def render(self):
+
+        #pygame init
+        
+        #toRend = np.array(memory[0x0200:0x0600], dtype = np.int32)
+        #gridarray = np.reshape(toRend, (32, 32), order='F')
+        #print('g ',gridarray[1][0])
+        #surface = pg.surfarray.make_surface(colors[gridarray])
+        #surface = pg.transform.scale(surface, (400, 400))
+        
+
+
         # get status info
         nametbl_idx = self.reg_ctrl & 0b11
         bg_pattern_tbl = 0x1000 if (self.reg_ctrl & 0x10) else 0x0000
         sprite_pattern_tbl = 0x1000 if (self.reg_ctrl & 0x08) else 0x0000
         sprite_size = self.reg_ctrl & 0x20 # 0 for 8*8, 1 for 8*16
 
+        # test ppu render nametbl
+        #for i in range(len(testtbl)):
+        #    ppuMemory[0x2000+i] = testtbl[i]
+        #print(ppuMemory[2000:2000+len(testtbl)])
+        #print(testtbl)
         # init frame
         fig, ax = plt.subplots()
-        nparr = np.zeros((700, 700))
-        #print(bg_pattern_tbl)
+        nparr = np.zeros((256, 256), dtype = np.int32)
+        #print("bg_pattern_tbl", bg_pattern_tbl)
+        #print("nametbl_idx", nametbl_idx)
         # start render 32 * 30 tiles
         for i in range(960): # total 960 tiles in one frame, took 960 byte in name table
                                # each tile is one 8x8 pixels graph
-            r = i//32
-            c = i%32
+            r = i%32
+            c = i//32
             idx = 0x2000+(0x400*nametbl_idx)+i
-            #print(hex(idx))
+            #print("idx", hex(idx))
             pat = ppuMemory[idx]%256
-            #print(pat)
+            #print("pat", pat)
             #print(self.chrom)
             #print(pat)
             for x in range(64): # display a tile, pixel 0's bit0 = 0 bit in the 16 bytes, bit1 = 64 bit in the 16 bytes
                 bit0 = 1 if (self.chrom [pat*16+x//8+bg_pattern_tbl] & (1 << (7-x%8))) else 0
                 bit1 = 1 if (self.chrom [pat*16+8+x//8+bg_pattern_tbl] & (1 << (7-x%8))) else 0
                 #print(x, bit1<<1+bit0, bit1, bit0)
-                nparr[r*8+x//8][c*8+x%8] = self.tbl[bit1*2+bit0] # show in np image
+                nparr[r*8+x%8][c*8+x//8] = self.tbl[bit1*2+bit0] # show in np image
                 #print(r*8+i//8, c*8+i%8)
-        im = ax.imshow(nparr, cmap='gray')
-        plt.show()
-        
+        #im = ax.imshow(nparr, cmap='gray')
+        #plt.show()
+        surface = pg.surfarray.make_surface(colors[nparr])
+        surface = pg.transform.scale(surface, (400, 400))
+        #screen.fill((30, 30, 30))
+        screen.blit(surface, (0, 0))
+        pg.display.flip()
 
     def tick(self, cycle):
         # 262 * 341
+        self.total_cycles += cycle
         self.cycle += cycle
         if self.cycle >= 341:
             self.cycle %= 341
@@ -168,20 +199,23 @@ class PPU:
         if self.scanline >= 262:  
             self.scanline %= 262
             self.frame+=1
+            print("frame= ", self.frame)
             # reset vblank flag
             self.reg_status &= 0b01111111
         
         # nmi is triggered at line 241 (idx from 0)
         # scanline 241, dot 1
-        if self.scanline == 241 and self.is_rend==0:
-            print(self.frame, self.cycle, self.scanline)
-            self.trigger_nmi()
+        if self.scanline == 242 and self.is_rend==0:
+            #print(self.frame, self.cycle, self.scanline)
+            if self.reg_ctrl&0b10000000:
+                self.trigger_nmi()
             self.reg_status |= 0b10000000
             # todo render image while every line of current frame have been scan over
             self.is_rend=1
             if self.frame>=0:
                 self.render()
-        if self.scanline > 241 and self.is_rend==1:
+                print("===========================================================================")
+        if self.scanline > 242 and self.is_rend==1:
             self.is_rend=0
         
         

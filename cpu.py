@@ -13,6 +13,40 @@ no_extra_absx = [0x1E, 0xFE, 0xDE, 0x5E, 0x3E, 0x7E, 0x9D]
 no_extra_absy = [0x99]
 no_extra_indy = [0x91]
 
+op_to_asembly = {0x69:"ADC", 0x65:"ADC", 0x75:"ADC", 0x6D:"ADC", 0x7D:"ADC", 0x79:"ADC", 0x61:"ADC", 0x71:"ADC", #ADC
+           0x29:"AND", 0x25:"AND", 0x35:"AND", 0x2D:"AND", 0x3D:"AND", 0x39:"AND", 0x21:"AND", 0x31:"AND", #AND
+           0x0A:"ASL", 0x06:"ASL", 0x16:"ASL", 0x0E:"ASL", 0x1E:"ASL", #ASL
+           0x10:"BRANCH", 0x30:"BRANCH", 0x50:"BRANCH", 0x70:"BRANCH", 0x90:"BRANCH", 0xB0:"BRANCH", 0xD0:"BRANCH", 0xF0:"BRANCH", #BRANCH
+           0x24:"BIT", 0x2C:"BIT", #BIT
+           0x00:"BRK", #BRK
+           0xC9:"CMP", 0xC5:"CMP", 0xD5:"CMP", 0xCD:"CMP", 0xDD:"CMP", 0xD9:"CMP", 0xC1:"CMP", 0xD1:"CMP", #CMP
+           0xE0:"CPX", 0xE4:"CPX", 0xEC:"CPX", #CPX
+           0xC0:"CPY", 0xC4:"CPY", 0xCC:"CPY",#CPY
+           0xC6:"DEC", 0xD6:"DEC", 0xCE:"DEC", 0xDE:"DEC", #DEC
+           0x49:"EOR", 0x45:"EOR", 0x55:"EOR", 0x4D:"EOR", 0x5D:"EOR", 0x59:"EOR", 0x41:"EOR", 0x51:"EOR", #EOR
+           0x18:"FLAG", 0x38:"FLAG", 0x58:"FLAG", 0x78:"FLAG", 0xB8:"FLAG", 0xD8:"FLAG", 0xF8:"FLAG", #FLAG
+           0xE6:"INC", 0xF6:"INC", 0xEE:"INC", 0xFE:"INC", #INC
+           0x4C:"JMP", 0x6C:"JMP", #JMP
+           0x20:"JSR", #JSR
+           0xA9:"LDA", 0xA5:"LDA", 0xB5:"LDA", 0xAD:"LDA", 0xBD:"LDA", 0xB9:"LDA", 0xA1:"LDA", 0xB1:"LDA", #LDA
+           0xA2:"LDX", 0xA6:"LDX", 0xB6:"LDX", 0xAE:"LDX", 0xBE:"LDX", #LDX
+           0xA0:"LDY", 0xA4:"LDY", 0xB4:"LDY", 0xAC:"LDY", 0xBC:"LDY", #LDY
+           0x4A:"LSR", 0x46:"LSR", 0x56:"LSR", 0x4E:"LSR", 0x5E:"LSR", #LSR
+           0xEA:"NOP", #NOP
+           0x09:"ORA", 0x05:"ORA", 0x15:"ORA", 0x0D:"ORA", 0x1D:"ORA", 0x19:"ORA", 0x01:"ORA", 0x11:"ORA", #ORA
+           0xAA:"RG", 0x8A:"RG", 0xCA:"RG", 0xE8:"RG", 0xA8:"RG", 0x98:"RG", 0x88:"RG", 0xC8:"RG", #Register Instructions
+           0x2A:"ROL", 0x26:"ROL", 0x36:"ROL", 0x2E:"ROL", 0x3E:"ROL", #ROL
+           0x6A:"ROR", 0x66:"ROR", 0x76:"ROR", 0x6E:"ROR", 0x7E:"ROR", #ROR
+           0x40:"RTI", #RTI
+           0x60:"RTS", #RTS
+           0xE9:"SBC", 0xE5:"SBC", 0xF5:"SBC", 0xED:"SBC", 0xFD:"SBC", 0xF9:"SBC", 0xE1:"SBC", 0xF1:"SBC", #SBC
+           0x85:"STA", 0x95:"STA", 0x8D:"STA", 0x9D:"STA", 0x99:"STA", 0x81:"STA", 0x91:"STA", #STA
+           0x9A:"STACK", 0xBA:"STACK", 0x48:"STACK", 0x68:"STACK", 0x08:"STACK", 0x28:"STACK", #STACK INSTRUCTION
+           0x86:"STX", 0x96:"STX", 0x8E:"STX", #STX
+           0x84:"STY", 0x94:"STY", 0x8C:"STY", #STY
+           #unofficial
+           }
+
 implemented = ["69", "65", "75", "6D", "7D", "79", "61", "71", #ADC
            "29", "25", "35", "2D", "3D", "39", "21", "31", #AND
            "0A", "06", "16", "0E", "1E", #ASL
@@ -286,20 +320,37 @@ class CPU:
         #|+-------- Overflow
         #+--------- Negative
 
+
+    def nes_init(self):
+        self.pc = memory[0xFFFD]<<8|memory[0xFFFC]
+        print("pc start at, ", hex(memory[0xFFFD]<<8|memory[0xFFFC]))
+        self.sp = 0xFD
+        self.status = 0x04
+        return 7 #cycles
  #   def fetch():
  #   def decode():
  #   def execute():
     # 2 cpu cycle
     def handle_nmi(self):
         # save pc to stack
-        self.sp-=1
-        self.sp%=256
-        memory[self.sp+0x100] = self.pc&0xff
-        self.sp-=1
-        self.sp%=256
-        memory[self.sp+0x100] = ((self.pc&0xff00)>>8)
+        self.pc %= 65536
+        tmp = self.pc 
+        memory[self.sp+0x100] = (self.pc & 0xff00) >> 8
+        self.sp = (self.sp-1)%256
+
+        self.pc-=1
+        self.pc %= 65536
+        byte1 = memory[self.pc]
+        byte2 = memory[self.pc+1]
+        addr =  byte2 << 8 | byte1
+        self.pc = addr
+
+        memory[self.sp+0x100] = (tmp & 0xff)
+        self.sp = (self.sp-1)%256
+
         #save status to stack
         memory[self.sp+0x100] = self.status
+        self.sp = (self.sp-1)%256
         # disable interrupt
         self.status |= 0b000001000
         # jump to nmi handler
@@ -377,8 +428,12 @@ class CPU:
         #print(self.pc)
         opcode = memory[self.pc]
         #DEBUG
-        print("==============================================")
-        print("PC=", hex(cpu.pc), "opcode=", hex(opcode))
+        #print("==============================================")
+        #if opcode not in op_to_asembly:
+        #    print("PC=", hex(cpu.pc), "opcode=", hex(opcode), "invalid opcode ")
+        #else:   
+        #    print("PC=", hex(cpu.pc), "opcode=", hex(opcode), "op=", op_to_asembly[opcode]
+        #          ,"V=", (self.ppu.total_cycles//341)%262, " H=", self.ppu.total_cycles%341, "total ppu cyc=", self.ppu.total_cycles)
         
         # do we need extra cycle due to the cross page
         if opcode not in opToTime:
@@ -951,7 +1006,7 @@ class CPU:
             self.pc = memory[(self.sp+2)%256+0x100]<<8 | memory[(self.sp+1)%256+0x100]
             self.sp += 2
             self.sp%=256
-            print("RTI")
+            #print("RTI")
         #RTS
         if opcode in [0x60]:
             self.pc = ((memory[(self.sp+2)%256+0x100]<<8 | memory[(self.sp+1)%256+0x100]) + 1)%65536
@@ -1354,8 +1409,7 @@ if __name__=="__main__":
         cpu = CPU()
         load_mapper0()
         cpu.ppu.load_mapper0()
-        cpu.pc = memory[0xFFFD]<<8|memory[0xFFFC]
-        print("pc start at, ", hex(memory[0xFFFD]<<8|memory[0xFFFC]))
+        lst_cycles = cpu.nes_init()
         
         running = True
         while running:
@@ -1379,7 +1433,7 @@ if __name__=="__main__":
                 memory[0xff] = 0x73
                 #print("s")
             '''
-            print("pc=",hex(cpu.pc))
+            #print("pc=",hex(cpu.pc))
             if cpu.ppu.is_nmi_triggered:
                 print("handle nmi in cpu")
                 cpu.handle_nmi()

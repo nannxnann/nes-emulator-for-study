@@ -1,8 +1,0 @@
-C9 correct 0 wrong 10000
-C5 correct 0 wrong 10000
-D5 correct 0 wrong 10000
-CD correct 0 wrong 10000
-DD correct 4 wrong 9996
-D9 correct 1 wrong 9999
-C1 correct 0 wrong 10000
-D1 correct 0 wrong 10000
