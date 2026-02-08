@@ -100,6 +100,9 @@ class PPU:
     def write_oamdata(self, data):
         self.reg_oamdata = data & 0b11111111
         self.oam[self.reg_oamaddr] = self.reg_oamdata
+    def write_oamdma(self, data):
+        for i in range(256):
+            self.oam[i] = data[i]
     def read_oamdata(self):
         return self.oam[self.reg_oamaddr]
     def read_vramdata(self):
@@ -178,6 +181,28 @@ class PPU:
                 bit0 = 1 if (self.chrom [pat*16+x//8+bg_pattern_tbl] & (1 << (7-x%8))) else 0
                 bit1 = 1 if (self.chrom [pat*16+8+x//8+bg_pattern_tbl] & (1 << (7-x%8))) else 0
                 self.display[r*8+x%8][c*8+x//8] = self.tbl[bit1*2+bit0] # show in np image
+        
+        # render oam, not consider 16 bit sprite yet.
+        sprite_pattern_idx = 0x1000 if self.reg_ctrl & 0b1000 else 0x0000
+        for i in range(64):
+            # y position
+            byte0 = self.oam[(i*4)]
+            # tile/index
+            byte1 = self.oam[(i*4)+1]
+            # attributes
+            byte2 = self.oam[(i*4)+2]
+            # x position
+            byte3 = self.oam[(i*4)+3]
+            for x in range(64): # display a tile, pixel 0's bit0 = 0 bit in the 16 bytes, bit1 = 64 bit in the 16 bytes
+                bit0 = 1 if (self.chrom[byte1*16+x//8+sprite_pattern_idx] & (1 << (7-x%8))) else 0
+                bit1 = 1 if (self.chrom[byte1*16+8+x//8+sprite_pattern_idx] & (1 << (7-x%8))) else 0
+                if byte3+x%8 >= 256 or byte0+x//8 >= 256:
+                    continue
+                if byte3+x%8 <0 or byte0+x//8 < 0:
+                    continue
+                self.display[byte3+x%8][byte0+x//8] = self.tbl[bit1*2+bit0] # show in np image
+
+
         surface = pg.surfarray.make_surface(colors[self.display])
         surface = pg.transform.scale(surface, (400, 400))
         screen.blit(surface, (0, 0))

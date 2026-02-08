@@ -258,7 +258,11 @@ class BUS:
         self.cpu.ppu.write_vramdata(data)
     def write_OAMDMA(self, data):
         if self.debug:
-            print("dma need to be implemented", hex(data))
+            print("wrtie to dma data = ", hex(data))
+        high = data&0xff
+        high <<= 8
+        self.cpu.cycle_this_ins += 513 # or 514 to be implemented
+        self.cpu.ppu.write_oamdma(memory[high:high+256])
     
     def read_PPUCTRL(self):
         if self.debug:
@@ -289,7 +293,7 @@ class BUS:
     def read_OAMDMA(self):
         if self.debug:
             print("not allow to read ppu reg_dma")
-        return self.cpu.ppu.reg_dma
+        return
 
 
     def write(self, addr, data):
