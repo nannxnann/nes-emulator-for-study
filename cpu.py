@@ -223,76 +223,90 @@ gamecode = [0x20, 0x06, 0x06, 0x20, 0x38, 0x06, 0x20, 0x0d, 0x06, 0x20, 0x2a, 0x
 
 
 memory = [0b0] * (65536) #65536 ~= 64k
-ppu_rg_map = [i for i in range(0x2000, 0x3FFF)]
+ppu_rg_map = set([i for i in range(0x2000, 0x3FFF)])
 
 class BUS:
     def __init__(self, cpu):
+        self.debug = 0
         self.cpu = cpu
-        pass
+        self.ppu_write_func = [self.write_PPUCTRL, self.write_PPUMASK, self.write_PPUSTATUS, self.write_OAMADDR, self.write_OAMDATA,
+                               self.write_PPUSCROLL, self.write_PPUADDR, self.write_PPUDATA]
+        self.ppu_read_func = [self.read_PPUCTRL, self.read_PPUMASK, self.read_PPUSTATUS, self.read_OAMADDR, self.read_OAMDATA,
+                               self.read_PPUSCROLL, self.read_PPUADDR, self.read_PPUDATA]
         #print("cpu bus init done")
+    def write_PPUCTRL(self, data):
+        self.cpu.ppu.write_ctrl(data)
+    def write_PPUMASK(self, data):
+        self.cpu.ppu.write_mask(data)
+    def write_PPUSTATUS(self, data):
+        if self.debug:
+            print("not allow to write ppu reg_status")
+    def write_OAMADDR(self, data):
+        self.cpu.ppu.write_oamaddr(data)
+        if self.debug:
+            print("oops we write reg_oamaddr, better implemented it write")
+    def write_OAMDATA(self, data):
+        self.cpu.ppu.write_oamdata(data)
+        if self.debug:
+            print("Do not write directly to this register in most cases, better implemented it write")
+    def write_PPUSCROLL(self, data):
+        if self.debug:
+            print("scroll game not support yet")
+    def write_PPUADDR(self, data):
+        self.cpu.ppu.write_vramaddr(data)
+    def write_PPUDATA(self, data):
+        self.cpu.ppu.write_vramdata(data)
+    def write_OAMDMA(self, data):
+        if self.debug:
+            print("dma need to be implemented", hex(data))
+    
+    def read_PPUCTRL(self):
+        if self.debug:
+            print("not allow to read ppu reg_ctrl")
+        return self.cpu.ppu.reg_ctrl
+    def read_PPUMASK(self):
+        if self.debug:
+            print("not allow to read ppu reg_mask")
+        return self.cpu.ppu.reg_mask
+    def read_PPUSTATUS(self):
+        return self.cpu.ppu.read_status()
+    def read_OAMADDR(self):
+        if self.debug:
+            print("not allow to read ppu reg_oamaddr")
+        return self.cpu.ppu.reg_oamaddr
+    def read_OAMDATA(self):
+        return self.cpu.ppu.read_oamdata()
+    def read_PPUSCROLL(self):
+        if self.debug:
+            print("not allow to read ppu reg_scroll")
+        return self.cpu.ppu.reg_scroll
+    def read_PPUADDR(self):
+        if self.debug:
+            print("not allow to read ppu reg_vramaddr")
+        return self.cpu.ppu.reg_vramaddr
+    def read_PPUDATA(self):
+        return self.cpu.ppu.read_vramdata()
+    def read_OAMDMA(self):
+        if self.debug:
+            print("not allow to read ppu reg_dma")
+        return self.cpu.ppu.reg_dma
+
+
     def write(self, addr, data):
         if addr in ppu_rg_map:
             rg_addr = (addr-0x2000)%8
-            if rg_addr==0:
-                self.cpu.ppu.write_ctrl(data)
-                return
-            elif rg_addr==1:
-                self.cpu.ppu.write_mask(data)
-                return
-            elif rg_addr==2:
-                print("not allow to write ppu reg_status")
-                return
-            elif rg_addr==3:
-                self.cpu.ppu.write_oamaddr(data)
-                print("oops we write reg_oamaddr, better implemented it write")
-                return
-            elif rg_addr==4:
-                self.cpu.ppu.write_oamdata(data)
-                print("Do not write directly to this register in most cases, better implemented it write")
-                return 
-            elif rg_addr==5:
-                print("scroll game not support yet")
-                return self.cpu.ppu.reg_scroll
-            elif rg_addr==6:
-                #print("write_vramaddr")
-                self.cpu.ppu.write_vramaddr(data)
-                return
-            elif rg_addr==7:
-                #print("write_vramdata")
-                self.cpu.ppu.write_vramdata(data)
-                return
-        if addr == 0x4014:
-            print("dma need to be implemented", hex(data))
-            return self.cpu.ppu.reg_dma
-        memory[addr%65536] = data
+            self.ppu_write_func[rg_addr](data)
+        elif addr == 0x4014:
+            self.write_OAMDMA(data)
+        else:
+            memory[addr%65536] = data
+
     def read(self, addr):
-        #if addr in ppu_rg_map:
         if addr in ppu_rg_map:
             rg_addr = (addr-0x2000)%8
-            if rg_addr==0:
-                print("not allow to read ppu reg_ctrl")
-                return self.cpu.ppu.reg_ctrl
-            elif rg_addr==1:
-                print("not allow to read ppu reg_mask")
-                return self.cpu.ppu.reg_mask
-            elif rg_addr==2:
-                return self.cpu.ppu.read_status()
-            elif rg_addr==3:
-                print("not allow to read ppu reg_oamaddr")
-                return self.cpu.ppu.reg_oamaddr
-            elif rg_addr==4:
-                return self.cpu.ppu.read_oamdata()
-            elif rg_addr==5:
-                print("not allow to read ppu reg_scroll")
-                return self.cpu.ppu.reg_scroll
-            elif rg_addr==6:
-                print("not allow to read ppu reg_vramaddr")
-                return self.cpu.ppu.reg_vramaddr
-            elif rg_addr==7:
-                return self.cpu.ppu.read_vramdata()
+            return self.ppu_read_func[rg_addr]()
         if addr == 0x4014:
-            print("not allow to read ppu reg_dma")
-            return self.cpu.ppu.reg_dma
+            return self.read_OAMDMA(self)
         return memory[addr%65536]
         
 
@@ -355,7 +369,7 @@ class CPU:
         self.status |= 0b000001000
         # jump to nmi handler
         self.pc = memory[0xfffb]<<8|memory[0xfffa]
-        print("nmi jump to ", hex(self.pc))
+        #print("nmi jump to ", hex(self.pc))
     # give addressing mode return address
 
     # addrmode 0: Immediate, 1: Zero Page, 2: Zero PageX, 3: Absolute, 4: AbsoluteX, 5: AbsoluteY, 6: (Inderect,X), 7:(Inderect,)Y 
@@ -1435,7 +1449,7 @@ if __name__=="__main__":
             '''
             #print("pc=",hex(cpu.pc))
             if cpu.ppu.is_nmi_triggered:
-                print("handle nmi in cpu")
+                #print("handle nmi in cpu")
                 cpu.handle_nmi()
                 cpu.ppu.is_nmi_triggered = 0
             cpu.ppu.tick(lst_cycles*3)

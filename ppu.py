@@ -1,8 +1,10 @@
 import pygame as pg
 import numpy as np
-import matplotlib.pyplot as plt
-from matplotlib.animation import FuncAnimation
+import time
+#import matplotlib.pyplot as plt
+#from matplotlib.animation import FuncAnimation
 
+lst_frame_time = [0]
 ppuMemory = [0b00000000] * (65536*2) # 64K 定址
 chrom = []
 testtbl = []
@@ -13,6 +15,8 @@ colors = np.array(color)
 clock = pg.time.Clock()
 # to be implemented
 class PPU:
+    nparr = np.zeros((256, 256), dtype = np.uint8)
+    display = [bytearray([0 for i in range(256)]) for j in range(256)]
     oam = [0 for i in range(256)]
     is_rend = 0
     frame = 0
@@ -50,7 +54,7 @@ class PPU:
             print("ppu load rom size ", len(self.chrom ))
             for i in range(8192):
                 ppuMemory[i] = self.chrom [i+16384+16]
-            self.chrom  = self.chrom [(16384+16):(16384+16+8192)]
+            self.chrom  = bytearray(self.chrom [(16384+16):(16384+16+8192)])
 
 
     # since there's a dependency "cpu -> ppu" exist, we can't actively notify cpu nmi happened
@@ -68,7 +72,7 @@ class PPU:
         # nmi trigger immediatly if vblank of PPUSTATUS = 1
         if self.reg_ctrl&0b10000000 and not (old&0b10000000) and self.reg_status&0b10000000:
             #todo trigger nmi
-            print("nmi triggered by ctrl")
+            #print("nmi triggered by ctrl")
             self.trigger_nmi()
 
     def write_mask(self, data):
@@ -116,7 +120,8 @@ class PPU:
             print("pallete")
             ret = ppuMemory[read_addr]
         else:
-            print("unexpected memory access")
+            pass
+            #print("unexpected memory access")
         return ret
     def write_vramdata(self, data):
         write_addr = self.reg_internal_vramaddr
@@ -129,7 +134,8 @@ class PPU:
             print("write pallete")
             ppuMemory[write_addr] = data&0b11111111
         else:
-            print("unexpected memory access")
+            pass
+            #print("unexpected memory access")
         addr_inc = True if (self.reg_ctrl&0b00000100) else False
         if addr_inc:
             self.reg_internal_vramaddr+=32
@@ -137,33 +143,26 @@ class PPU:
             self.reg_internal_vramaddr+=1
         return
     def render(self):
-
         #pygame init
-        
+        if self.frame%60==0:
+            cur_frame_time = time.perf_counter()
+            frame_dur = cur_frame_time - lst_frame_time[0]
+            lst_frame_time[0] = cur_frame_time
+            print(f" 60 frame took: {frame_dur:.6f} sec")
         #toRend = np.array(memory[0x0200:0x0600], dtype = np.int32)
         #gridarray = np.reshape(toRend, (32, 32), order='F')
         #print('g ',gridarray[1][0])
         #surface = pg.surfarray.make_surface(colors[gridarray])
         #surface = pg.transform.scale(surface, (400, 400))
         
-
-
         # get status info
         nametbl_idx = self.reg_ctrl & 0b11
         bg_pattern_tbl = 0x1000 if (self.reg_ctrl & 0x10) else 0x0000
         sprite_pattern_tbl = 0x1000 if (self.reg_ctrl & 0x08) else 0x0000
         sprite_size = self.reg_ctrl & 0x20 # 0 for 8*8, 1 for 8*16
 
-        # test ppu render nametbl
-        #for i in range(len(testtbl)):
-        #    ppuMemory[0x2000+i] = testtbl[i]
-        #print(ppuMemory[2000:2000+len(testtbl)])
-        #print(testtbl)
-        # init frame
-        fig, ax = plt.subplots()
-        nparr = np.zeros((256, 256), dtype = np.int32)
-        #print("bg_pattern_tbl", bg_pattern_tbl)
-        #print("nametbl_idx", nametbl_idx)
+        # ppu render nametbl
+        
         # start render 32 * 30 tiles
         for i in range(960): # total 960 tiles in one frame, took 960 byte in name table
                                # each tile is one 8x8 pixels graph
@@ -178,16 +177,12 @@ class PPU:
             for x in range(64): # display a tile, pixel 0's bit0 = 0 bit in the 16 bytes, bit1 = 64 bit in the 16 bytes
                 bit0 = 1 if (self.chrom [pat*16+x//8+bg_pattern_tbl] & (1 << (7-x%8))) else 0
                 bit1 = 1 if (self.chrom [pat*16+8+x//8+bg_pattern_tbl] & (1 << (7-x%8))) else 0
-                #print(x, bit1<<1+bit0, bit1, bit0)
-                nparr[r*8+x%8][c*8+x//8] = self.tbl[bit1*2+bit0] # show in np image
-                #print(r*8+i//8, c*8+i%8)
-        #im = ax.imshow(nparr, cmap='gray')
-        #plt.show()
-        surface = pg.surfarray.make_surface(colors[nparr])
+                self.display[r*8+x%8][c*8+x//8] = self.tbl[bit1*2+bit0] # show in np image
+        surface = pg.surfarray.make_surface(colors[self.display])
         surface = pg.transform.scale(surface, (400, 400))
-        #screen.fill((30, 30, 30))
         screen.blit(surface, (0, 0))
         pg.display.flip()
+        
 
     def tick(self, cycle):
         # 262 * 341
@@ -199,7 +194,7 @@ class PPU:
         if self.scanline >= 262:  
             self.scanline %= 262
             self.frame+=1
-            print("frame= ", self.frame)
+            #print("frame= ", self.frame)
             # reset vblank flag
             self.reg_status &= 0b01111111
         
@@ -214,7 +209,7 @@ class PPU:
             self.is_rend=1
             if self.frame>=0:
                 self.render()
-                print("===========================================================================")
+                #print("===========================================================================")
         if self.scanline > 242 and self.is_rend==1:
             self.is_rend=0
         
@@ -230,7 +225,7 @@ if __name__=="__main__":
         chrom = chrom[(16384+16):(16384+16+8192)]
     #print(''.join('{:02x} '.format(x) for x in chrom[:8]))
     tbl = {0:0, 1: 90, 2: 180, 3: 255}
-    fig, ax = plt.subplots()
+    #fig, ax = plt.subplots()
     # Initialize an image plot with a dummy array
     
     #def update(frame):
@@ -256,5 +251,5 @@ if __name__=="__main__":
             #print(x, bit1<<1+bit0, bit1, bit0)
             nparr[r*8+i//8][c*8+i%8] = tbl[bit1*2+bit0] # show in np image
             #print(r*8+i//8, c*8+i%8)
-    im = ax.imshow(nparr, cmap='gray')
-    plt.show()
+    #im = ax.imshow(nparr, cmap='gray')
+    #plt.show()

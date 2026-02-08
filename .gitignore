@@ -1,3 +1,4 @@
 rom/
 testlog/
 testrom/
+__pycache__/
