@@ -4,6 +4,8 @@ import time
 #import matplotlib.pyplot as plt
 #from matplotlib.animation import FuncAnimation
 
+background_palette_base = 0x3F00
+sprite_palette_base = 0x3F10
 lst_frame_time = [0]
 ppuMemory = [0b00000000] * (65536*2) # 64K 定址
 chrom = []
@@ -14,7 +16,41 @@ color = [[i, i, i] for i in range(256)]
 colors = np.array(color)
 clock = pg.time.Clock()
 # to be implemented
+sys_palette = {0x00: (163, 163, 163), 0x01: (1, 52, 244   ), 0x02: (47, 12, 255  ), 0x03: (113, 0, 255  ),
+               0x04: (161, 1, 177  ), 0x05: (181, 0, 66   ), 0x06: (167, 13, 1   ), 0x07: (124, 55, 1   ),
+               0x08: (49, 89, 0    ), 0x09: (30, 113, 9   ), 0x0A: (0, 139, 16   ), 0x0B: (0, 122, 44   ),
+               0x0C: (2, 92, 157   ), 0x0D: (0, 0, 0      ), 0x0E: (0, 0, 0      ), 0x0F: (0, 0, 0      ),
+               0x10: (255, 255, 255), 0x11: (28, 132, 255 ), 0x12: (105, 81, 255 ), 0x13: (187, 42, 255 ),
+               0x14: (253, 27, 255 ), 0x15: (255, 37, 163 ), 0x16: (255, 70, 10  ), 0x17: (224, 118, 0  ),
+               0x18: (153, 157, 0  ), 0x19: (74, 216, 0   ), 0x1A: (0, 255, 4    ), 0x1B: (7, 215, 87   ),
+               0x1C: (3, 180, 236  ), 0x1D: (0, 0, 0      ), 0x1E: (0, 0, 0      ), 0x1F: (0, 0, 0      ),
+               0x20: (255, 255, 255), 0x21: (145, 255, 255), 0x22: (214, 222, 255), 0x23: (255, 180, 255),
+               0x24: (255, 160, 255), 0x25: (255, 165, 255), 0x26: (255, 192, 181), 0x27: (255, 255, 58 ),
+               0x28: (255, 255, 0  ), 0x29: (212, 255, 0  ), 0x2A: (144, 255, 63 ), 0x2B: (103, 255, 183),
+               0x2C: (108, 255, 255), 0x2D: (131, 131, 131), 0x2E: (0, 0, 0      ), 0x2F: (0, 0, 0      ),
+               0x30: (255, 255, 255), 0x31: (255, 255, 255), 0x32: (255, 255, 255), 0x33: (255, 255, 255),
+               0x34: (255, 255, 255), 0x35: (255, 255, 255), 0x36: (255, 255, 255), 0x37: (255, 255, 255), 
+               0x38: (255, 255, 255), 0x39: (255, 255, 255), 0x3A: (255, 255, 255), 0x3B: (255, 255, 255), 
+               0x3C: (255, 255, 255), 0x3D: (255, 255, 255), 0x3E: (0, 0, 0      ), 0x3F: (0, 0, 0      )}
+sys_palette_arr = [[163, 163, 163], [1, 52, 244   ], [47, 12, 255  ], [113, 0, 255  ], 
+                   [161, 1, 177  ], [181, 0, 66   ], [167, 13, 1   ], [124, 55, 1   ], 
+                   [49, 89, 0    ], [30, 113, 9   ], [0, 139, 16   ], [0, 122, 44   ], 
+                   [2, 92, 157   ], [0, 0, 0      ], [0, 0, 0      ], [0, 0, 0      ], 
+                   [255, 255, 255], [28, 132, 255 ], [105, 81, 255 ], [187, 42, 255 ], 
+                   [253, 27, 255 ], [255, 37, 163 ], [255, 70, 10  ], [224, 118, 0  ], 
+                   [153, 157, 0  ], [74, 216, 0   ], [0, 255, 4    ], [7, 215, 87   ], 
+                   [3, 180, 236  ], [0, 0, 0      ], [0, 0, 0      ], [0, 0, 0      ], 
+                   [255, 255, 255], [145, 255, 255], [214, 222, 255], [255, 180, 255], 
+                   [255, 160, 255], [255, 165, 255], [255, 192, 181], [255, 255, 58 ], 
+                   [255, 255, 0  ], [212, 255, 0  ], [144, 255, 63 ], [103, 255, 183], 
+                   [108, 255, 255], [131, 131, 131], [0, 0, 0      ], [0, 0, 0      ], 
+                   [255, 255, 255], [255, 255, 255], [255, 255, 255], [255, 255, 255], 
+                   [255, 255, 255], [255, 255, 255], [255, 255, 255], [255, 255, 255],  
+                   [255, 255, 255], [255, 255, 255], [255, 255, 255], [255, 255, 255],  
+                   [255, 255, 255], [255, 255, 255], [0, 0, 0      ], [0, 0, 0      ]]
+sys_palette_np = np.array(sys_palette_arr)
 class PPU:
+
     nparr = np.zeros((256, 256), dtype = np.uint8)
     display = [bytearray([0 for i in range(256)]) for j in range(256)]
     oam = [0 for i in range(256)]
@@ -119,8 +155,8 @@ class PPU:
             self.reg_internal_readbuffer = ppuMemory[read_addr]
         elif read_addr < 0x3eff:
             print("invlid, why?")
-        elif read_addr < 0x3eff:
-            print("pallete")
+        elif read_addr < 0x3fff:
+            #print("pallete")
             ret = ppuMemory[read_addr]
         else:
             pass
@@ -133,8 +169,8 @@ class PPU:
             ppuMemory[write_addr] = data&0b11111111
         elif write_addr < 0x3eff:
             print("invlid, why?")
-        elif write_addr < 0x3eff:
-            print("write pallete")
+        elif write_addr < 0x3fff:
+            #print("write pallete")
             ppuMemory[write_addr] = data&0b11111111
         else:
             pass
@@ -171,17 +207,19 @@ class PPU:
                                # each tile is one 8x8 pixels graph
             r = i%32
             c = i//32
+            mapping = [左上, 左下, ...]
             idx = 0x2000+(0x400*nametbl_idx)+i
             #print("idx", hex(idx))
             pat = ppuMemory[idx]%256
             #print("pat", pat)
             #print(self.chrom)
             #print(pat)
+            sprite_palette_idx = background_palette_base+8
             for x in range(64): # display a tile, pixel 0's bit0 = 0 bit in the 16 bytes, bit1 = 64 bit in the 16 bytes
                 bit0 = 1 if (self.chrom [pat*16+x//8+bg_pattern_tbl] & (1 << (7-x%8))) else 0
                 bit1 = 1 if (self.chrom [pat*16+8+x//8+bg_pattern_tbl] & (1 << (7-x%8))) else 0
-                self.display[r*8+x%8][c*8+x//8] = self.tbl[bit1*2+bit0] # show in np image
-        
+                #self.display[r*8+x%8][c*8+x//8] = self.tbl[bit1*2+bit0] # show in np image
+                self.display[r*8+x%8][c*8+x//8] = ppuMemory[sprite_palette_idx+bit1*2+bit0]
         # render oam, not consider 16 bit sprite yet.
         sprite_pattern_idx = 0x1000 if self.reg_ctrl & 0b1000 else 0x0000
         for i in range(64):
@@ -193,6 +231,7 @@ class PPU:
             byte2 = self.oam[(i*4)+2]
             # x position
             byte3 = self.oam[(i*4)+3]
+            sprite_palette_idx = sprite_palette_base+(byte2&0b11)*4
             for x in range(64): # display a tile, pixel 0's bit0 = 0 bit in the 16 bytes, bit1 = 64 bit in the 16 bytes
                 bit0 = 1 if (self.chrom[byte1*16+x//8+sprite_pattern_idx] & (1 << (7-x%8))) else 0
                 bit1 = 1 if (self.chrom[byte1*16+8+x//8+sprite_pattern_idx] & (1 << (7-x%8))) else 0
@@ -200,10 +239,12 @@ class PPU:
                     continue
                 if byte3+x%8 <0 or byte0+x//8 < 0:
                     continue
-                self.display[byte3+x%8][byte0+x//8] = self.tbl[bit1*2+bit0] # show in np image
-
-
-        surface = pg.surfarray.make_surface(colors[self.display])
+                self.display[byte3+x%8][byte0+x//8] = ppuMemory[sprite_palette_idx+bit1*2+bit0]
+                #self.display[byte3+x%8][byte0+x//8] = self.tbl[bit1*2+bit0] # show in np image
+        #print(self.display)
+        #print(ppuMemory[0x3F00:0x3FFF])
+        #clock.tick(60)
+        surface = pg.surfarray.make_surface(sys_palette_np[self.display])
         surface = pg.transform.scale(surface, (400, 400))
         screen.blit(surface, (0, 0))
         pg.display.flip()
