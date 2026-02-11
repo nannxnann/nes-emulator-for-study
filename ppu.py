@@ -199,27 +199,39 @@ class PPU:
         bg_pattern_tbl = 0x1000 if (self.reg_ctrl & 0x10) else 0x0000
         sprite_pattern_tbl = 0x1000 if (self.reg_ctrl & 0x08) else 0x0000
         sprite_size = self.reg_ctrl & 0x20 # 0 for 8*8, 1 for 8*16
-
+        attr_offset = 0x3c0
         # ppu render nametbl
-        
+                        # bot right     #bot left      #top right       #top left
+        which_quater = {(2,2):0b11000000, (2,0):0b00110000, (0,2):0b00001100, (0,0):0b00000011,
+                        (3,3):0b11000000, (2,1):0b00110000, (0,3):0b00001100, (0,1):0b00000011,
+                        (2,3):0b11000000, (3,0):0b00110000, (1,2):0b00001100, (1,0):0b00000011,
+                        (3,2):0b11000000, (3,1):0b00110000, (1,3):0b00001100, (1,1):0b00000011}
+        shift_bits   = {(2,2):6, (2,0):4, (0,2):2, (0,0):0,
+                        (3,3):6, (2,1):4, (0,3):2, (0,1):0,
+                        (2,3):6, (3,0):4, (1,2):2, (1,0):0,
+                        (3,2):6, (3,1):4, (1,3):2, (1,1):0}
         # start render 32 * 30 tiles
         for i in range(960): # total 960 tiles in one frame, took 960 byte in name table
                                # each tile is one 8x8 pixels graph
+            # pygame seems to transpose the array to be render
             r = i%32
             c = i//32
-            mapping = [左上, 左下, ...]
+            attr_r = r//4
+            attr_c = c//4
+            #mapping = [左上, 左下, ...]
             idx = 0x2000+(0x400*nametbl_idx)+i
+            attr_idx = 0x2000+(0x400*nametbl_idx)+attr_offset+attr_c*8+attr_r
             #print("idx", hex(idx))
             pat = ppuMemory[idx]%256
             #print("pat", pat)
             #print(self.chrom)
             #print(pat)
-            sprite_palette_idx = background_palette_base+8
+            background_palette_idx = background_palette_base+((ppuMemory[attr_idx]&which_quater[(c%4, r%4)])>>shift_bits[(c%4, r%4)])*4
             for x in range(64): # display a tile, pixel 0's bit0 = 0 bit in the 16 bytes, bit1 = 64 bit in the 16 bytes
                 bit0 = 1 if (self.chrom [pat*16+x//8+bg_pattern_tbl] & (1 << (7-x%8))) else 0
                 bit1 = 1 if (self.chrom [pat*16+8+x//8+bg_pattern_tbl] & (1 << (7-x%8))) else 0
                 #self.display[r*8+x%8][c*8+x//8] = self.tbl[bit1*2+bit0] # show in np image
-                self.display[r*8+x%8][c*8+x//8] = ppuMemory[sprite_palette_idx+bit1*2+bit0]
+                self.display[r*8+x%8][c*8+x//8] = ppuMemory[background_palette_idx+bit1*2+bit0]
         # render oam, not consider 16 bit sprite yet.
         sprite_pattern_idx = 0x1000 if self.reg_ctrl & 0b1000 else 0x0000
         for i in range(64):
@@ -231,16 +243,61 @@ class PPU:
             byte2 = self.oam[(i*4)+2]
             # x position
             byte3 = self.oam[(i*4)+3]
+
+            behind_bg = True if byte2 & 0b00100000 else False
+            if behind_bg:
+                    continue
+            horizon_flip = True if byte2 & 0b01000000 else False
+            vertical_flip = True if byte2 & 0b10000000 else False
             sprite_palette_idx = sprite_palette_base+(byte2&0b11)*4
-            for x in range(64): # display a tile, pixel 0's bit0 = 0 bit in the 16 bytes, bit1 = 64 bit in the 16 bytes
-                bit0 = 1 if (self.chrom[byte1*16+x//8+sprite_pattern_idx] & (1 << (7-x%8))) else 0
-                bit1 = 1 if (self.chrom[byte1*16+8+x//8+sprite_pattern_idx] & (1 << (7-x%8))) else 0
-                if byte3+x%8 >= 256 or byte0+x//8 >= 256:
-                    continue
-                if byte3+x%8 <0 or byte0+x//8 < 0:
-                    continue
-                self.display[byte3+x%8][byte0+x//8] = ppuMemory[sprite_palette_idx+bit1*2+bit0]
-                #self.display[byte3+x%8][byte0+x//8] = self.tbl[bit1*2+bit0] # show in np image
+            if not horizon_flip and not vertical_flip:
+                for x in range(64): # display a tile, pixel 0's bit0 = 0 bit in the 16 bytes, bit1 = 64 bit in the 16 bytes
+                    bit0 = 1 if (self.chrom[byte1*16+x//8+sprite_pattern_idx] & (1 << (7-x%8))) else 0
+                    bit1 = 1 if (self.chrom[byte1*16+8+x//8+sprite_pattern_idx] & (1 << (7-x%8))) else 0
+                    if byte3+x%8 >= 256 or byte0+x//8 >= 256:
+                        continue
+                    if byte3+x%8 <0 or byte0+x//8 < 0:
+                        continue
+                    if bit1*2+bit0 == 0:
+                        continue
+                    self.display[byte3+x%8][byte0+x//8] = ppuMemory[sprite_palette_idx+bit1*2+bit0]
+                    #self.display[byte3+x%8][byte0+x//8] = self.tbl[bit1*2+bit0] # show in np image
+            elif horizon_flip and vertical_flip:
+                for x in range(64, -1, -1): # display a tile, pixel 0's bit0 = 0 bit in the 16 bytes, bit1 = 64 bit in the 16 bytes
+                    bit0 = 1 if (self.chrom[byte1*16+x//8+sprite_pattern_idx] & (1 << (7-x%8))) else 0
+                    bit1 = 1 if (self.chrom[byte1*16+8+x//8+sprite_pattern_idx] & (1 << (7-x%8))) else 0
+                    if byte3+x%8 >= 256 or byte0+x//8 >= 256:
+                        continue
+                    if byte3+x%8 <0 or byte0+x//8 < 0:
+                        continue
+                    if bit1*2+bit0 == 0:
+                        continue
+                    self.display[byte3+x%8][byte0+x//8] = ppuMemory[sprite_palette_idx+bit1*2+bit0]
+                    #self.display[byte3+x%8][byte0+x//8] = self.tbl[bit1*2+bit0] # show in np image
+            elif horizon_flip:
+                for x in range(64): # display a tile, pixel 0's bit0 = 0 bit in the 16 bytes, bit1 = 64 bit in the 16 bytes
+                    bit0 = 1 if (self.chrom[byte1*16+x//8+sprite_pattern_idx] & (1 << (7-x%8))) else 0
+                    bit1 = 1 if (self.chrom[byte1*16+8+x//8+sprite_pattern_idx] & (1 << (7-x%8))) else 0
+                    if byte3+x%8 >= 256 or byte0+x//8 >= 256:
+                        continue
+                    if byte3+x%8 <0 or byte0+x//8 < 0:
+                        continue
+                    if bit1*2+bit0 == 0:
+                        continue
+                    self.display[byte3+7-(x%8)][byte0+x//8] = ppuMemory[sprite_palette_idx+bit1*2+bit0]
+                    #self.display[byte3+x%8][byte0+x//8] = self.tbl[bit1*2+bit0] # show in np image
+            elif vertical_flip:
+                for x in range(64): # display a tile, pixel 0's bit0 = 0 bit in the 16 bytes, bit1 = 64 bit in the 16 bytes
+                    bit0 = 1 if (self.chrom[byte1*16+x//8+sprite_pattern_idx] & (1 << (7-x%8))) else 0
+                    bit1 = 1 if (self.chrom[byte1*16+8+x//8+sprite_pattern_idx] & (1 << (7-x%8))) else 0
+                    if byte3+x%8 >= 256 or byte0+x//8 >= 256:
+                        continue
+                    if byte3+x%8 <0 or byte0+x//8 < 0:
+                        continue
+                    if bit1*2+bit0 == 0:
+                        continue
+                    self.display[byte3+x%8][byte0+7-(x//8)] = ppuMemory[sprite_palette_idx+bit1*2+bit0]
+                    #self.display[byte3+x%8][byte0+x//8] = self.tbl[bit1*2+bit0] # show in np image
         #print(self.display)
         #print(ppuMemory[0x3F00:0x3FFF])
         #clock.tick(60)
