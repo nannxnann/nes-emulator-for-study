@@ -3,7 +3,6 @@ import numpy as np
 import time
 #import matplotlib.pyplot as plt
 #from matplotlib.animation import FuncAnimation
-
 background_palette_base = 0x3F00
 sprite_palette_base = 0x3F10
 lst_frame_time = [0]
@@ -48,9 +47,11 @@ sys_palette_arr = [[163, 163, 163], [1, 52, 244   ], [47, 12, 255  ], [113, 0, 2
                    [255, 255, 255], [255, 255, 255], [255, 255, 255], [255, 255, 255],  
                    [255, 255, 255], [255, 255, 255], [255, 255, 255], [255, 255, 255],  
                    [255, 255, 255], [255, 255, 255], [0, 0, 0      ], [0, 0, 0      ]]
-sys_palette_np = np.array(sys_palette_arr)
+sys_palette_np = np.array(sys_palette_arr, dtype=np.uint8)
 class PPU:
-
+    _frame_buf = np.empty((256, 256, 3), dtype=np.uint8)
+    _base_surface = pg.Surface((256, 256))
+    after_rend = 0
     nparr = np.zeros((256, 256), dtype = np.uint8)
     display = [bytearray([0 for i in range(256)]) for j in range(256)]
     oam = [0 for i in range(256)]
@@ -80,6 +81,15 @@ class PPU:
     # temporary for render ppu background
     chrom = []
     tbl = {0:0, 1: 90, 2: 180, 3: 255}
+                            # bot right     #bot left      #top right       #top left
+    which_quater = {(2,2):0b11000000, (2,0):0b00110000, (0,2):0b00001100, (0,0):0b00000011,
+                    (3,3):0b11000000, (2,1):0b00110000, (0,3):0b00001100, (0,1):0b00000011,
+                    (2,3):0b11000000, (3,0):0b00110000, (1,2):0b00001100, (1,0):0b00000011,
+                    (3,2):0b11000000, (3,1):0b00110000, (1,3):0b00001100, (1,1):0b00000011}
+    shift_bits   = {(2,2):6, (2,0):4, (0,2):2, (0,0):0,
+                    (3,3):6, (2,1):4, (0,3):2, (0,1):0,
+                    (2,3):6, (3,0):4, (1,2):2, (1,0):0,
+                    (3,2):6, (3,1):4, (1,3):2, (1,1):0}
 
     def load_mapper0(self):
         with open("rom/test2.nes", 'rb') as f:
@@ -137,8 +147,7 @@ class PPU:
         self.reg_oamdata = data & 0b11111111
         self.oam[self.reg_oamaddr] = self.reg_oamdata
     def write_oamdma(self, data):
-        for i in range(256):
-            self.oam[i] = data[i]
+        self.oam[:] = data[:256]
     def read_oamdata(self):
         return self.oam[self.reg_oamaddr]
     def read_vramdata(self):
@@ -181,19 +190,8 @@ class PPU:
         else:
             self.reg_internal_vramaddr+=1
         return
-    def render(self):
-        #pygame init
-        if self.frame%60==0:
-            cur_frame_time = time.perf_counter()
-            frame_dur = cur_frame_time - lst_frame_time[0]
-            lst_frame_time[0] = cur_frame_time
-            print(f" 60 frame took: {frame_dur:.6f} sec")
-        #toRend = np.array(memory[0x0200:0x0600], dtype = np.int32)
-        #gridarray = np.reshape(toRend, (32, 32), order='F')
-        #print('g ',gridarray[1][0])
-        #surface = pg.surfarray.make_surface(colors[gridarray])
-        #surface = pg.transform.scale(surface, (400, 400))
-        
+    def render(self):     
+        timeA = time.perf_counter()
         # get status info
         nametbl_idx = self.reg_ctrl & 0b11
         bg_pattern_tbl = 0x1000 if (self.reg_ctrl & 0x10) else 0x0000
@@ -201,16 +199,10 @@ class PPU:
         sprite_size = self.reg_ctrl & 0x20 # 0 for 8*8, 1 for 8*16
         attr_offset = 0x3c0
         # ppu render nametbl
-                        # bot right     #bot left      #top right       #top left
-        which_quater = {(2,2):0b11000000, (2,0):0b00110000, (0,2):0b00001100, (0,0):0b00000011,
-                        (3,3):0b11000000, (2,1):0b00110000, (0,3):0b00001100, (0,1):0b00000011,
-                        (2,3):0b11000000, (3,0):0b00110000, (1,2):0b00001100, (1,0):0b00000011,
-                        (3,2):0b11000000, (3,1):0b00110000, (1,3):0b00001100, (1,1):0b00000011}
-        shift_bits   = {(2,2):6, (2,0):4, (0,2):2, (0,0):0,
-                        (3,3):6, (2,1):4, (0,3):2, (0,1):0,
-                        (2,3):6, (3,0):4, (1,2):2, (1,0):0,
-                        (3,2):6, (3,1):4, (1,3):2, (1,1):0}
+
+        
         # start render 32 * 30 tiles
+        
         for i in range(960): # total 960 tiles in one frame, took 960 byte in name table
                                # each tile is one 8x8 pixels graph
             # pygame seems to transpose the array to be render
@@ -226,12 +218,14 @@ class PPU:
             #print("pat", pat)
             #print(self.chrom)
             #print(pat)
-            background_palette_idx = background_palette_base+((ppuMemory[attr_idx]&which_quater[(c%4, r%4)])>>shift_bits[(c%4, r%4)])*4
+            background_palette_idx = background_palette_base+((ppuMemory[attr_idx]&self.which_quater[(c%4, r%4)])>>self.shift_bits[(c%4, r%4)])*4
             for x in range(64): # display a tile, pixel 0's bit0 = 0 bit in the 16 bytes, bit1 = 64 bit in the 16 bytes
                 bit0 = 1 if (self.chrom [pat*16+x//8+bg_pattern_tbl] & (1 << (7-x%8))) else 0
                 bit1 = 1 if (self.chrom [pat*16+8+x//8+bg_pattern_tbl] & (1 << (7-x%8))) else 0
                 #self.display[r*8+x%8][c*8+x//8] = self.tbl[bit1*2+bit0] # show in np image
                 self.display[r*8+x%8][c*8+x//8] = ppuMemory[background_palette_idx+bit1*2+bit0]
+        
+        timeB = time.perf_counter()
         # render oam, not consider 16 bit sprite yet.
         sprite_pattern_idx = 0x1000 if self.reg_ctrl & 0b1000 else 0x0000
         for i in range(64):
@@ -266,21 +260,21 @@ class PPU:
                 for x in range(64, -1, -1): # display a tile, pixel 0's bit0 = 0 bit in the 16 bytes, bit1 = 64 bit in the 16 bytes
                     bit0 = 1 if (self.chrom[byte1*16+x//8+sprite_pattern_idx] & (1 << (7-x%8))) else 0
                     bit1 = 1 if (self.chrom[byte1*16+8+x//8+sprite_pattern_idx] & (1 << (7-x%8))) else 0
-                    if byte3+x%8 >= 256 or byte0+x//8 >= 256:
+                    if byte3+7-(x%8) >= 256 or byte0+7-(x//8) >= 256:
                         continue
-                    if byte3+x%8 <0 or byte0+x//8 < 0:
+                    if byte3+7-(x%8) <0 or byte0+7-(x//8) < 0:
                         continue
                     if bit1*2+bit0 == 0:
                         continue
-                    self.display[byte3+x%8][byte0+x//8] = ppuMemory[sprite_palette_idx+bit1*2+bit0]
+                    self.display[byte3+7-(x%8)][byte0+7-(x//8)] = ppuMemory[sprite_palette_idx+bit1*2+bit0]
                     #self.display[byte3+x%8][byte0+x//8] = self.tbl[bit1*2+bit0] # show in np image
             elif horizon_flip:
                 for x in range(64): # display a tile, pixel 0's bit0 = 0 bit in the 16 bytes, bit1 = 64 bit in the 16 bytes
                     bit0 = 1 if (self.chrom[byte1*16+x//8+sprite_pattern_idx] & (1 << (7-x%8))) else 0
                     bit1 = 1 if (self.chrom[byte1*16+8+x//8+sprite_pattern_idx] & (1 << (7-x%8))) else 0
-                    if byte3+x%8 >= 256 or byte0+x//8 >= 256:
+                    if byte3+7-(x%8) >= 256 or byte0+x//8 >= 256:
                         continue
-                    if byte3+x%8 <0 or byte0+x//8 < 0:
+                    if byte3+7-(x%8) <0 or byte0+x//8 < 0:
                         continue
                     if bit1*2+bit0 == 0:
                         continue
@@ -290,30 +284,52 @@ class PPU:
                 for x in range(64): # display a tile, pixel 0's bit0 = 0 bit in the 16 bytes, bit1 = 64 bit in the 16 bytes
                     bit0 = 1 if (self.chrom[byte1*16+x//8+sprite_pattern_idx] & (1 << (7-x%8))) else 0
                     bit1 = 1 if (self.chrom[byte1*16+8+x//8+sprite_pattern_idx] & (1 << (7-x%8))) else 0
-                    if byte3+x%8 >= 256 or byte0+x//8 >= 256:
+                    if byte3+x%8 >= 256 or byte0+7-(x//8) >= 256:
                         continue
-                    if byte3+x%8 <0 or byte0+x//8 < 0:
+                    if byte3+x%8 <0 or byte0+7-(x//8) < 0:
                         continue
                     if bit1*2+bit0 == 0:
                         continue
                     self.display[byte3+x%8][byte0+7-(x//8)] = ppuMemory[sprite_palette_idx+bit1*2+bit0]
                     #self.display[byte3+x%8][byte0+x//8] = self.tbl[bit1*2+bit0] # show in np image
+        timeC = time.perf_counter()
         #print(self.display)
         #print(ppuMemory[0x3F00:0x3FFF])
         #clock.tick(60)
-        surface = pg.surfarray.make_surface(sys_palette_np[self.display])
-        surface = pg.transform.scale(surface, (400, 400))
+        for event in pg.event.get():
+            if event.type == pg.QUIT:
+                exit()           
+        timeD = time.perf_counter()
+        #aaa = sys_palette_np[self.display]
+        flat = b''.join(self.display)
+        display_arr = np.frombuffer(flat, dtype=np.uint8).reshape(256, 256)
+        np.take(sys_palette_np, display_arr, axis=0, out=self._frame_buf)
+        pg.surfarray.blit_array(self._base_surface, self._frame_buf)
+        timeE = time.perf_counter()
+        #surface = pg.surfarray.make_surface(aaa)
+        timeF = time.perf_counter()
+        surface = pg.transform.scale(self._base_surface, (400, 400))
+        timeG = time.perf_counter()
         screen.blit(surface, (0, 0))
+        timeH = time.perf_counter()
         pg.display.flip()
-        
+        timeI = time.perf_counter()
+        #print(f"Time taken: {timeB-timeA:.3f}s, {timeC-timeB:.3f}s, {timeD-timeC:.3f}s")
+        #print(f"Time taken: {timeE-timeD:.3f}s, {timeF-timeE:.3f}s, {timeG-timeF:.3f}s, {timeH-timeG:.3f}s, {timeI-timeH:.3f}s")
+        if self.frame%60==0:
+            cur_frame_time = time.perf_counter()
+            frame_dur = cur_frame_time - lst_frame_time[0]
+            lst_frame_time[0] = cur_frame_time
+            fps = 60 / frame_dur if frame_dur > 0 else 0
+            print(f"60 frames: {frame_dur:.3f}s  ({fps:.1f} fps)")
 
     def tick(self, cycle):
         # 262 * 341
         self.total_cycles += cycle
         self.cycle += cycle
         if self.cycle >= 341:
+            self.scanline += (self.cycle // 341)
             self.cycle %= 341
-            self.scanline += 1
         if self.scanline >= 262:  
             self.scanline %= 262
             self.frame+=1
@@ -330,9 +346,17 @@ class PPU:
             self.reg_status |= 0b10000000
             # todo render image while every line of current frame have been scan over
             self.is_rend=1
-            if self.frame>=0:
-                self.render()
-                #print("===========================================================================")
+            #if self.frame>=0:
+            
+            before_rend = time.perf_counter()
+            if self.after_rend < before_rend:
+                if before_rend - self.after_rend > 0.05:
+                    print(f"tick time: {before_rend - self.after_rend:.3f}s")
+            self.render()
+            self.after_rend = time.perf_counter()
+            if self.after_rend - before_rend > 0.05:
+                print(f"render time: {self.after_rend - before_rend:.3f}s")
+            
         if self.scanline > 242 and self.is_rend==1:
             self.is_rend=0
         
